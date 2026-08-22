@@ -1457,3 +1457,287 @@ Dataset → Job → Processing → Analysis → Stored Result
 **Database:** PostgreSQL 18
 
 **Next milestone:** Job Management and Processing Pipeline
+
+
+---
+
+# 34. Development Log — 2026-08-23
+
+Today's work extended the backend from basic dataset persistence into the first working **asynchronous analysis-job pipeline**.
+
+## Analysis Job Module
+
+Implemented the analysis-job domain with:
+
+```text
+AnalysisJob
+├── id
+├── dataset_id
+├── analysis_type
+├── status
+├── retry_count
+├── created_at
+├── started_at
+└── completed_at
+```
+
+The job lifecycle is:
+
+```text
+PENDING
+   |
+   v
+PROCESSING
+   |
+   +------------+
+   |            |
+   v            v
+COMPLETED     FAILED
+```
+
+## Analysis Job API
+
+Implemented and tested:
+
+```http
+POST /api/analysis/jobs
+GET  /api/analysis/jobs/{id}
+```
+
+The API was tested using **Postman** for clearer JSON responses and easier request management.
+
+Invalid job IDs are handled by the global exception system and return:
+
+```json
+{
+  "status": 404,
+  "error": "ANALYSIS_JOB_NOT_FOUND",
+  "message": "..."
+}
+```
+
+## Global Exception Handling
+
+Created an application-wide exception package:
+
+```text
+exception/
+├── ErrorResponse.java
+└── GlobalExceptionHandler.java
+```
+
+The global handler currently handles:
+
+```text
+DatasetNotFoundException
+AnalysisJobNotFoundException
+```
+
+`ErrorResponse` was moved out of the Dataset DTO package because it is an application-wide API error contract rather than a Dataset-specific DTO.
+
+## Controlled Job State Transitions
+
+Added domain methods to `AnalysisJob`:
+
+```java
+markAsProcessing()
+markAsCompleted()
+markAsFailed()
+incrementRetryCount()
+```
+
+This keeps job lifecycle changes inside meaningful domain operations.
+
+## Retry Support
+
+Added:
+
+```text
+retry_count INTEGER NOT NULL DEFAULT 0
+```
+
+to `analysis_jobs`.
+
+This prepares the system for retry handling when the Python analysis service is temporarily unavailable.
+
+## Database Verification
+
+Verified the PostgreSQL schema and analysis jobs. The worker successfully changes jobs from:
+
+```text
+PENDING → PROCESSING
+```
+
+with:
+
+```text
+retry_count = 0
+started_at  = populated
+completed_at = NULL
+```
+
+## First Job Worker
+
+Implemented:
+
+```text
+analysis/worker/
+└── AnalysisJobWorker.java
+```
+
+using:
+
+```java
+@Scheduled(fixedDelay = 5000)
+```
+
+Current flow:
+
+```text
+Every 5 seconds
+      |
+      v
+Find oldest PENDING job
+      |
+      v
+Mark PROCESSING
+      |
+      v
+Save to PostgreSQL
+```
+
+The database is currently acting as the persistent job queue rather than an in-memory Java `List`.
+
+## FIFO Job Selection
+
+The repository now selects the oldest pending job using:
+
+```text
+findNextPendingJob(...)
+```
+
+Conceptually:
+
+```sql
+SELECT *
+FROM analysis_jobs
+WHERE status = 'PENDING'
+ORDER BY created_at ASC
+LIMIT 1;
+```
+
+This establishes FIFO processing behavior.
+
+## Current Execution Architecture
+
+```text
+Client
+   |
+   | POST /api/analysis/jobs
+   v
+AnalysisJobController
+   |
+   v
+AnalysisJobService
+   |
+   v
+PostgreSQL
+   |
+   | PENDING
+   v
+AnalysisJobWorker
+   |
+   | PROCESSING
+   v
+Python Analysis API
+   |
+   | Analysis result
+   v
+AnalysisJobWorker
+   |
+   +---- COMPLETED
+   |
+   +---- FAILED
+   |
+   v
+PostgreSQL
+```
+
+The Python integration is the next major implementation step.
+
+## Important Development Lessons
+
+### DTO Responsibility
+
+Feature-specific DTOs remain inside their modules:
+
+```text
+dataset/dto/
+analysis/dto/
+```
+
+Application-wide error contracts belong in the cross-cutting exception package:
+
+```text
+exception/ErrorResponse.java
+```
+
+### Database Schema Evolution
+
+Adding a Java entity field does not replace proper database migration management.
+
+For development, the new column was added with:
+
+```sql
+ALTER TABLE analysis_jobs
+ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0;
+```
+
+For production, the project should eventually use Flyway or Liquibase.
+
+### Repository Naming
+
+Spring Data JPA derives repository behavior from method names. A naming mismatch can prevent the application from starting.
+
+Example:
+
+```text
+findByContentHash()    ✓
+findbyContentHash()    ✗
+```
+
+## Current Milestone
+
+```text
+[████████████████████] Backend Job Foundation
+
+✓ Dataset API
+✓ Dataset persistence
+✓ Duplicate detection
+✓ Global exception handling
+✓ Error response contract
+✓ Analysis Job entity
+✓ Analysis Job API
+✓ Analysis Job persistence
+✓ Job status lifecycle
+✓ Retry counter
+✓ Postman API testing
+✓ PostgreSQL job verification
+✓ Database-backed job polling
+✓ PENDING → PROCESSING worker
+□ Transaction-safe job claiming
+□ Java → Python API contract
+□ Python/FastAPI analysis service
+□ EDA execution
+□ PROCESSING → COMPLETED
+□ PROCESSING → FAILED
+□ Retry execution
+□ Analysis result storage
+```
+
+## Next Development Session
+
+The next implementation step is **transaction-safe job claiming** so multiple workers cannot claim the same pending job.
+
+After that, we will implement the Java → Python API contract and connect the first `EDA` execution pipeline.
+
