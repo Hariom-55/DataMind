@@ -1,0 +1,52 @@
+package com.datamind.datamind_api.analysis.controller;
+
+
+import com.datamind.datamind_api.analysis.dto.AnalysisJobCreateRequest;
+import com.datamind.datamind_api.analysis.dto.AnalysisJobResponse;
+import com.datamind.datamind_api.analysis.entity.AnalysisJob;
+import com.datamind.datamind_api.analysis.service.AnalysisJobService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("api/analysis/jobs")
+public class AnalysisJobController
+{
+    private final AnalysisJobService analysisJobService ;
+
+    public AnalysisJobController(
+            AnalysisJobService analysisJobService
+    ){
+        this.analysisJobService = analysisJobService;
+    }
+
+    @PostMapping
+    public ResponseEntity<AnalysisJobResponse> createAnalysisJob(
+            @RequestBody AnalysisJobCreateRequest request
+            ){
+        AnalysisJob analysisJob = analysisJobService.createAnalysisJob(
+                request.getDatasetId(),
+                request.getAnalysisType()
+        );
+
+        return ResponseEntity.ok(
+                new AnalysisJobResponse(analysisJob)
+        );
+
+
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<AnalysisJobResponse> getAnalysisJobById(
+            @PathVariable UUID id
+    ){
+        AnalysisJob analysisJob =
+                analysisJobService.getAnalysisJobById(id);
+
+        return ResponseEntity.ok(
+                new AnalysisJobResponse(analysisJob)
+        );
+    }
+
+}
