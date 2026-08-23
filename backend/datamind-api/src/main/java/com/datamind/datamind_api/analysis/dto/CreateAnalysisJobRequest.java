@@ -3,12 +3,12 @@ package com.datamind.datamind_api.analysis.dto;
 import com.datamind.datamind_api.analysis.entity.enums.AnalysisType;
 
 import java.util.UUID;
-public class AnalysisJobCreateRequest
+public class CreateAnalysisJobRequest
 {
     private UUID datasetId;
     private AnalysisType analysisType ;
 
-    public  AnalysisJobCreateRequest() {}
+    public CreateAnalysisJobRequest() {}
 
     public UUID getDatasetId() {
         return datasetId;

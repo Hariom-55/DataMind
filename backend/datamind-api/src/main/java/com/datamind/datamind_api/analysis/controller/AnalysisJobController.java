@@ -1,7 +1,7 @@
 package com.datamind.datamind_api.analysis.controller;
 
 
-import com.datamind.datamind_api.analysis.dto.AnalysisJobCreateRequest;
+import com.datamind.datamind_api.analysis.dto.CreateAnalysisJobRequest;
 import com.datamind.datamind_api.analysis.dto.AnalysisJobResponse;
 import com.datamind.datamind_api.analysis.entity.AnalysisJob;
 import com.datamind.datamind_api.analysis.service.AnalysisJobService;
@@ -23,7 +23,7 @@ public class AnalysisJobController
 
     @PostMapping
     public ResponseEntity<AnalysisJobResponse> createAnalysisJob(
-            @RequestBody AnalysisJobCreateRequest request
+            @RequestBody CreateAnalysisJobRequest request
             ){
         AnalysisJob analysisJob = analysisJobService.createAnalysisJob(
                 request.getDatasetId(),

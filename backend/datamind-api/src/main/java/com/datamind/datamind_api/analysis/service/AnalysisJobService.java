@@ -66,4 +66,21 @@ public class AnalysisJobService
 
         return job ;
     }
+
+    @Transactional
+    public void completeJob(UUID jobId)
+    {
+        AnalysisJob job = getAnalysisJobById(jobId);
+        job.markAsCompleted();
+        analysisJobRepository.save(job);
+    }
+
+    @Transactional
+    public void failJob(UUID jobId)
+    {
+        AnalysisJob job = getAnalysisJobById(jobId);
+        job.incrementRetryCount();
+        job.markAsFailed();
+        analysisJobRepository.save(job);
+    }
 }
