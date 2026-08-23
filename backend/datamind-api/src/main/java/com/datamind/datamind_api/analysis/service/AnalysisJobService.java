@@ -8,7 +8,9 @@ import com.datamind.datamind_api.analysis.repository.AnalysisJobRepository;
 import com.datamind.datamind_api.dataset.entity.Dataset;
 import com.datamind.datamind_api.dataset.service.DatasetService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -48,5 +50,20 @@ public class AnalysisJobService
                                 "Analysis job not Found with Id: " + id
                         )
                 );
+    }
+
+    @Transactional
+    public Optional<AnalysisJob> claimNextPendingJob()
+    {
+        Optional<AnalysisJob> job = analysisJobRepository.findNextPendingJob(
+                AnalysisJobStatus.PENDING
+        );
+
+        job.ifPresent( analysisJob -> {
+            analysisJob.markAsProcessing();
+            analysisJobRepository.save(analysisJob);
+        });
+
+        return job ;
     }
 }
