@@ -2,6 +2,7 @@ package com.datamind.datamind_api.analysis.service;
 
 import com.datamind.datamind_api.analysis.entity.AnalysisJob;
 import com.datamind.datamind_api.analysis.entity.AnalysisResult;
+import com.datamind.datamind_api.analysis.exception.AnalysisJobNotFoundException;
 import com.datamind.datamind_api.analysis.repository.AnalysisJobRepository;
 import com.datamind.datamind_api.analysis.repository.AnalysisResultRepository;
 import org.springframework.stereotype.Service;
@@ -15,14 +16,14 @@ import java.util.UUID;
 public class AnalysisExecutionService
 {
     private final AnalysisJobRepository analysisJobRepository;
-    private final AnalysisResultRepository analysisResultRepository;
+    private final AnalysisResultService analysisResultService;
 
     public AnalysisExecutionService(
             AnalysisJobRepository analysisJobRepository,
-            AnalysisResultRepository analysisResultRepository
+            AnalysisResultService analysisResultService
     ){
         this.analysisJobRepository = analysisJobRepository;
-        this.analysisResultRepository = analysisResultRepository;
+        this.analysisResultService = analysisResultService;
     }
 
     @Transactional
@@ -33,16 +34,13 @@ public class AnalysisExecutionService
         AnalysisJob job = analysisJobRepository
                 .findById(jobId)
                 .orElseThrow(
-                        () -> new RuntimeException(
+                        () -> new AnalysisJobNotFoundException(
                                 "Analysis job not found: " + jobId
                         )
                 );
 
-        AnalysisResult result = new AnalysisResult(job, resultData);
-
-        analysisResultRepository.save(result);
+        analysisResultService.saveResult(job, resultData);
         job.markAsCompleted();
-
         analysisJobRepository.save(job);
     }
 }

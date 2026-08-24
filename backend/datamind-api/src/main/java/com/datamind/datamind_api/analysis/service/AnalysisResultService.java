@@ -3,6 +3,7 @@ package com.datamind.datamind_api.analysis.service;
 import com.datamind.datamind_api.analysis.entity.AnalysisJob;
 import com.datamind.datamind_api.analysis.entity.AnalysisResult;
 import com.datamind.datamind_api.analysis.exception.AnalysisJobNotFoundException;
+import com.datamind.datamind_api.analysis.exception.AnalysisResultNotFoundException;
 import com.datamind.datamind_api.analysis.repository.AnalysisResultRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +39,7 @@ public class AnalysisResultService
         return analysisResultRepository
                 .findByJobId(jobId)
                 .orElseThrow(
-                        () -> new AnalysisJobNotFoundException(
+                        () -> new AnalysisResultNotFoundException(
                                 "Analysis result not found for Job: "+jobId
                         )
                 );

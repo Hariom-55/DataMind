@@ -39,6 +39,9 @@ public class AnalysisJob
 
     private LocalDateTime completedAt;
 
+    @Column(columnDefinition = "TEXT")
+    private String errorMessage;
+
     public AnalysisJob () {}
 
     public AnalysisJob (
@@ -84,7 +87,10 @@ public class AnalysisJob
         return retryCount;
     }
 
-   
+   public String getErrorMessage()
+   {
+       return errorMessage;
+   }
 
     public void setStartedAt(LocalDateTime startedAt) {
         this.startedAt = startedAt;
@@ -116,6 +122,7 @@ public class AnalysisJob
     {
         this.status = AnalysisJobStatus.FAILED;
         this.completedAt = LocalDateTime.now();
+        this.errorMessage =errorMessage;
     }
 
     public void incrementRetryCount()

@@ -65,11 +65,14 @@ public class AnalysisJobWorker
                         job.getId()
                 );
             }else {
-                analysisJobService.failJob(job.getId());
+                String failureReason = response.getError() != null
+                        ? response.getError()
+                        : "Python Service did not return a completed result" ;
+                analysisJobService.failJob(job.getId(), failureReason);
                 log.warn(
                         "Analysis job {} failed: {}",
                         job.getId(),
-                        response.getError()
+                        failureReason
                 );
             }
 
@@ -77,7 +80,7 @@ public class AnalysisJobWorker
         }
         catch (PythonAnalysisException ex)
         {
-            analysisJobService.failJob(job.getId());
+            analysisJobService.failJob(job.getId(), ex.getMessage());
             log.error(
                     "Analysis job {} failed calling Python service",
                     job.getId(),

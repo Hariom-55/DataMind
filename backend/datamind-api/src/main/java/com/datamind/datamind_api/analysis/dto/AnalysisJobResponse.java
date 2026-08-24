@@ -16,6 +16,7 @@ public class AnalysisJobResponse
     private LocalDateTime createdAt;
     private LocalDateTime startedAt;
     private LocalDateTime completedAt;
+    private String errorMessage;
 
     public AnalysisJobResponse(AnalysisJob analysisJob)
     {
@@ -26,6 +27,7 @@ public class AnalysisJobResponse
         this.createdAt = analysisJob.getCreatedAt();
         this.startedAt = analysisJob.getStartedAt();
         this.completedAt = analysisJob.getCompletedAt();
+        this.errorMessage = analysisJob.getErrorMessage();
 
     }
 
@@ -55,5 +57,10 @@ public class AnalysisJobResponse
 
     public UUID getDatasetId() {
         return datasetId;
+    }
+
+    public String getErrorMessage()
+    {
+        return errorMessage;
     }
 }
