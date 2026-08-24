@@ -76,11 +76,11 @@ public class AnalysisJobService
     }
 
     @Transactional
-    public void failJob(UUID jobId)
+    public void failJob(UUID jobId, String errorMessage)
     {
         AnalysisJob job = getAnalysisJobById(jobId);
         job.incrementRetryCount();
-        job.markAsFailed();
+        job.markAsFailed(errorMessage);
         analysisJobRepository.save(job);
     }
 }
