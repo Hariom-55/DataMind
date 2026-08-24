@@ -41,7 +41,7 @@ public class Dataset
     private LocalDateTime createdAt;
     private LocalDateTime processedAt; 
 
-    protected Dataset(){} 
+    public Dataset(){}
 
     public Dataset(
             String name,
