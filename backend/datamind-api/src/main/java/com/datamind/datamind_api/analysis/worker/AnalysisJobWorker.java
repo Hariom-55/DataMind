@@ -5,7 +5,9 @@ import com.datamind.datamind_api.analysis.entity.AnalysisJob;
 import com.datamind.datamind_api.analysis.integration.python.PythonAnalysisClient;
 import com.datamind.datamind_api.analysis.integration.python.PythonAnalysisException;
 import com.datamind.datamind_api.analysis.integration.python.dto.PythonAnalysisResponse;
+import com.datamind.datamind_api.analysis.service.AnalysisExecutionService;
 import com.datamind.datamind_api.analysis.service.AnalysisJobService;
+import com.datamind.datamind_api.analysis.service.AnalysisResultService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -18,14 +20,16 @@ public class AnalysisJobWorker
 
     private final AnalysisJobService analysisJobService ;
     private final PythonAnalysisClient pythonAnalysisClient;
-
+    private final AnalysisExecutionService analysisExecutionService;
     public AnalysisJobWorker(
             AnalysisJobService analysisJobService,
-            PythonAnalysisClient pythonAnalysisClient
+            PythonAnalysisClient pythonAnalysisClient,
+            AnalysisExecutionService analysisExecutionService
     )
     {
         this.analysisJobService = analysisJobService ;
         this.pythonAnalysisClient = pythonAnalysisClient;
+        this.analysisExecutionService = analysisExecutionService;
     }
 
     @Scheduled(fixedDelay = 5000)
@@ -43,24 +47,41 @@ public class AnalysisJobWorker
             PythonAnalysisResponse response = pythonAnalysisClient.analyze(
                     job.getId(),
                     job.getDataset().getId(),
-                    job.getAnalysisType().toString()
+                    job.getAnalysisType().toString(),
+                    job.getDataset().getStoragePath()
             );
 
-            if ("RECEIVED".equals(response.getStatus()) || response.getError() == null)
+            if ("COMPLETED".equals(response.getStatus())
+            && response.getError() == null
+            && response.getResult() != null)
             {
-                analysisJobService.completeJob(job.getId());
-                log.info("Analysis job {} completed", job.getId());
-            }
-            else
-            {
+                analysisExecutionService.completeJob(
+                        job.getId(),
+                        response.getResult()
+                );
+                
+                log.info(
+                        "Analysis job {} completed successfully",
+                        job.getId()
+                );
+            }else {
                 analysisJobService.failJob(job.getId());
-                log.warn("Analysis job {} failed: {}", job.getId(), response.getError());
+                log.warn(
+                        "Analysis job {} failed: {}",
+                        job.getId(),
+                        response.getError()
+                );
             }
+
+
         }
         catch (PythonAnalysisException ex)
         {
             analysisJobService.failJob(job.getId());
-            log.error("Analysis job {} failed calling Python service", job.getId(), ex);
+            log.error(
+                    "Analysis job {} failed calling Python service",
+                    job.getId(),
+                    ex);
         }
     }
 }

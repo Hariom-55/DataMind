@@ -20,9 +20,13 @@ public class PythonAnalysisClient
         this.pythonRestClient = pythonRestClient;
     }
 
-    public PythonAnalysisResponse analyze(UUID jobId, UUID datasetId, String analysisType)
+    public PythonAnalysisResponse analyze(
+            UUID jobId,
+            UUID datasetId,
+            String analysisType,
+            String datasetPath)
     {
-        PythonAnalysisRequest request = new PythonAnalysisRequest(jobId, datasetId, analysisType);
+        PythonAnalysisRequest request = new PythonAnalysisRequest(jobId, datasetId, analysisType,datasetPath);
 
         try
         {
@@ -36,7 +40,6 @@ public class PythonAnalysisClient
         }
         catch (RestClientException ex)
         {
-            // Covers connection refused, timeout, 4xx/5xx from the Python service.
             throw new PythonAnalysisException(
                     "Call to Python analysis service failed for jobId=" + jobId, ex
             );

@@ -31,4 +31,15 @@ public class GlobalExceptionHandler
         );
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleIllegalArgument(IllegalArgumentException exception)
+    {
+
+        return new ErrorResponse(
+                400,
+                "INVALID_REQUEST",
+                exception.getMessage()
+        );
+    }
 }

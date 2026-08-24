@@ -2,13 +2,13 @@ package com.datamind.datamind_api.dataset.entity;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import java.util.UUID;
-import org.hibernate.annotations.UuidGenerator;
+import java.util.UUID;  
 import jakarta.persistence.Column;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import java.time.LocalDateTime;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.UuidGenerator;
 
 
 @Entity // Tells Hibernate to treat this java class as a persistent database entity
@@ -19,6 +19,7 @@ public class Dataset
     @Id
     private UUID id;
 
+    @Column(nullable = false)
     private String name; 
 
     @Column(
@@ -28,10 +29,13 @@ public class Dataset
     )
     private String contentHash ;
 
+    @Column(nullable = false)
+    private String storagePath;
+
     private Long fileSize;
     private String fileType; 
 
-    @Enumerated(EnumType.STRING)
+   @Enumerated(EnumType.STRING)
     private DatasetStatus status;
 
     private LocalDateTime createdAt;
@@ -39,9 +43,13 @@ public class Dataset
 
     protected Dataset(){} 
 
-    public Dataset(String name, String contentHash , Long fileSize ,String fileType)
-    {
-        this.name = name ;
+    public Dataset(
+            String name,
+            String contentHash,
+            Long fileSize,
+            String fileType
+    ){
+        this.name = name;
         this.contentHash = contentHash;
         this.fileSize = fileSize;
         this.fileType = fileType;
@@ -103,6 +111,12 @@ public class Dataset
     public LocalDateTime getProcessedAt()
     {
         return processedAt;
+    }
+
+    public String getStoragePath() {return storagePath;}
+
+    public void setStoragePath(String storagePath){
+        this.storagePath = storagePath;
     }
 
     

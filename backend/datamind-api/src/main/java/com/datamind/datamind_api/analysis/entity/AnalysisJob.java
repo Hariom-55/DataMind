@@ -30,6 +30,7 @@ public class AnalysisJob
 
     @Column(nullable = false)
     private Integer retryCount = 0;
+    
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -83,6 +84,8 @@ public class AnalysisJob
         return retryCount;
     }
 
+   
+
     public void setStartedAt(LocalDateTime startedAt) {
         this.startedAt = startedAt;
     }
@@ -109,7 +112,7 @@ public class AnalysisJob
 
     }
 
-    public void markAsFailed()
+    public void markAsFailed(String errorMessage)
     {
         this.status = AnalysisJobStatus.FAILED;
         this.completedAt = LocalDateTime.now();

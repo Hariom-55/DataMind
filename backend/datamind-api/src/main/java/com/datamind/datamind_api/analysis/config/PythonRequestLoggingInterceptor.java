@@ -10,11 +10,7 @@ import org.springframework.http.client.ClientHttpResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-/**
- * Logs every outgoing request's method, URI, headers, and body at DEBUG level.
- * Set logging.level.com.datamind.datamind_api.analysis.config=DEBUG in
- * application.properties to see this output while diagnosing integration issues.
- */
+
 public class PythonRequestLoggingInterceptor implements ClientHttpRequestInterceptor
 {
     private static final Logger log = LoggerFactory.getLogger(PythonRequestLoggingInterceptor.class);
