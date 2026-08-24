@@ -20,16 +20,30 @@ class EDAService :
             for column , dtype in df.dtypes.items()
         }
 
-        #4. Missing Values
+        #4. Missing Values 
         missing_values = {
             column: int(count)
             for column, count in df.isnull().sum().items()
         }
 
-        #5. Duplicate rows
+        #5.Missing Value Percentage
+        missing_percentages = {
+            column : float(round((count/len(df))*100,2))
+            if len(df) > 0
+            else 0.0
+            for column, count in df.isnull().sum().items()
+        }
+
+        #6. Unique Value Counts 
+        unique_value_counts = {
+            column: int(df[column].nunique(dropna=True))
+            for column in df.columns
+        }
+
+        #7. Duplicate rows
         duplicate_rows = int(df.duplicated().sum())
 
-        #6. Numerical statistics
+        #8. Numerical statistics
         numeric_df = df.select_dtypes(include="number")
 
         numeric_statistics = {}
@@ -45,11 +59,37 @@ class EDAService :
                 for column in numeric_df.columns
             }
 
+        #9. Categorical Statistics 
+        categorical_df = df.select_dtypes(
+            include=["object", "category","bool"]
+        )
+
+        categorical_statistics = {} 
+
+        for column in categorical_df.columns:
+
+            value_counts = (df[column].value_counts(dropna=False)
+                            .head(10)
+                            )
+
+            top_values = {
+                str(value): int(count)
+                for value, count in value_counts.items()
+            }
+
+            categorical_statistics[column] = {
+                "uniqueCount" : int(df[column].nunique(dropna=True)),
+                "topValues": top_values
+            }
+
         return {
             "overview": overview,
             "columns":columns,
             "dataTypes": data_types,
             "missingValues": missing_values,
+            "missingPercentages": missing_percentages,
+            "uniqueValueCounts": unique_value_counts,
             "duplicateRows": duplicate_rows,
             "numericStatistics": numeric_statistics,
+            "categoricalStatistics": categorical_statistics,
         }

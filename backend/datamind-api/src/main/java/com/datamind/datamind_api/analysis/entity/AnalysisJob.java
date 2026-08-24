@@ -115,12 +115,14 @@ public class AnalysisJob
     {
         this.status = AnalysisJobStatus.COMPLETED;
         this.completedAt = LocalDateTime.now();
+        this.errorMessage = null;
 
     }
 
     public void markAsFailed(String errorMessage)
     {
         this.status = AnalysisJobStatus.FAILED;
+        this.startedAt = null;
         this.completedAt = LocalDateTime.now();
         this.errorMessage =errorMessage;
     }
@@ -128,5 +130,12 @@ public class AnalysisJob
     public void incrementRetryCount()
     {
         this.retryCount++;
+    }
+
+    public void retry()
+    {
+        this.status = AnalysisJobStatus.PENDING;
+        this.completedAt = null;
+        this.errorMessage = null;
     }
 }

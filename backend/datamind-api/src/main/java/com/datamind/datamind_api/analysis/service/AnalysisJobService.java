@@ -18,6 +18,7 @@ public class AnalysisJobService
 {
     private final AnalysisJobRepository analysisJobRepository;
     private final DatasetService datasetService;
+    private static final int MAX_RETRIES = 3;
 
     public AnalysisJobService(
             AnalysisJobRepository analysisJobRepository,
@@ -80,6 +81,13 @@ public class AnalysisJobService
     {
         AnalysisJob job = getAnalysisJobById(jobId);
         job.incrementRetryCount();
+
+        if (job.getRetryCount() < MAX_RETRIES)
+        {
+            job.retry();
+            analysisJobRepository.save(job);
+            return;
+        }
         job.markAsFailed(errorMessage);
         analysisJobRepository.save(job);
     }
