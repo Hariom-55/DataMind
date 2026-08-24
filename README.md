@@ -1,300 +1,57 @@
-# DataMind
+# DataMind — Autonomous Data Intelligence Platform
 
-**DataMind** is an Autonomous Data Intelligence Platform designed to register datasets, detect duplicate content, create analysis jobs, execute those jobs asynchronously through a Spring worker, communicate with a Python/FastAPI analysis engine, and expose job state through a REST API.
+DataMind is a production-oriented data intelligence platform being built with **Java/Spring Boot**, **Python**, and **PostgreSQL**. The system accepts datasets, creates analysis jobs, executes analysis asynchronously through a Python service, and persists structured results.
 
-> **Current milestone:** Dataset persistence and duplicate detection are implemented. Analysis jobs are persisted and processed by a scheduled Spring worker. Java → FastAPI communication is working end-to-end. The Python endpoint is currently an acknowledgement/stub; the real EDA engine is the next major implementation step.
-
----
-
-## 1. Architecture
+## Current Architecture
 
 ```text
-Client / Postman / Frontend
-            |
-            | REST / JSON
-            v
-   +--------------------+
-   |   Spring Boot API  |
-   |       :8080        |
-   +---------+----------+
-             |
-      +------+------+
-      |             |
-      v             v
- Dataset Module   Analysis Job Module
-      |             |
-      +------+------+
-             v
-      +--------------+
-      |  PostgreSQL  |
-      |     :5432    |
-      +------+-------+
-             |
-       PENDING job
-             |
-             v
-      +--------------+
-      | AnalysisJob   |
-      |    Worker     |
-      +------+-------+
-             |
-       PROCESSING
-             |
-             v
-      +--------------+
-      | Python Client |
-      | Spring        |
-      +------+-------+
-             |
-          HTTP/JSON
-             |
-             v
-      +--------------+
-      | FastAPI       |
-      | Analysis      |
-      | Engine :8000  |
-      +------+-------+
-             |
-          result
-             |
-             v
-      COMPLETED / FAILED
-             |
-             v
-         PostgreSQL
+Client / Postman
+      |
+      v
+Spring Boot API (Java 21)
+      |
+      +----> PostgreSQL
+      |       |- datasets
+      |       |- analysis_jobs
+      |       `- analysis_results
+      |
+      v
+Scheduled AnalysisJobWorker
+      |
+      v
+Python Analytics Service
+      |
+      v
+EDA Result
+      |
+      v
+PostgreSQL JSON result
 ```
 
-The key architectural decision is that **analysis execution is asynchronous**. The API creates a persistent job and returns it; a scheduled worker later claims the job and invokes Python.
+## Milestones Completed
 
----
+### 1. Backend Foundation
+- Maven + Spring Boot project
+- Java 21
+- Spring Web
+- Dependency Injection / IoC
+- Constructor injection
+- Service and repository layers
+- REST API fundamentals
 
-## 2. Repository Structure
+### 2. PostgreSQL + JPA
+- PostgreSQL integration
+- JPA/Hibernate
+- UUID identifiers
+- Entity relationships
+- Transactions
+- Enum persistence
+- JSON result persistence
 
-```text
-DataMind/
-│
-├── analytics/
-│   ├── app/
-│   │   ├── main.py
-│   │   └── api/
-│   │       └── analysis.py
-│   └── requirements.txt
-│
-├── backend/
-│   └── datamind-api/
-│       ├── pom.xml
-│       └── src/
-│           ├── main/
-│           │   ├── java/com/datamind/datamind_api/
-│           │   │
-│           │   ├── DatamindApiApplication.java
-│           │   │
-│           │   ├── analysis/
-│           │   │   ├── config/
-│           │   │   │   ├── PythonClientConfig.java
-│           │   │   │   └── PythonRequestLoggingInterceptor.java
-│           │   │   ├── controller/
-│           │   │   │   └── AnalysisJobController.java
-│           │   │   ├── dto/
-│           │   │   │   ├── CreateAnalysisJobRequest.java
-│           │   │   │   └── AnalysisJobResponse.java
-│           │   │   ├── entity/
-│           │   │   │   ├── AnalysisJob.java
-│           │   │   │   └── enums/
-│           │   │   │       ├── AnalysisJobStatus.java
-│           │   │   │       └── AnalysisType.java
-│           │   │   ├── exception/
-│           │   │   │   └── AnalysisJobNotFoundException.java
-│           │   │   ├── integration/python/
-│           │   │   │   ├── PythonAnalysisClient.java
-│           │   │   │   ├── PythonAnalysisException.java
-│           │   │   │   └── dto/
-│           │   │   │       ├── PythonAnalysisRequest.java
-│           │   │   │       └── PythonAnalysisResponse.java
-│           │   │   ├── repository/
-│           │   │   │   └── AnalysisJobRepository.java
-│           │   │   ├── service/
-│           │   │   │   └── AnalysisJobService.java
-│           │   │   └── worker/
-│           │   │       └── AnalysisJobWorker.java
-│           │   │
-│           │   ├── dataset/
-│           │   │   ├── controller/DatasetController.java
-│           │   │   ├── dto/
-│           │   │   │   ├── DatasetCreateRequest.java
-│           │   │   │   └── DatasetResponse.java
-│           │   │   ├── entity/
-│           │   │   │   ├── Dataset.java
-│           │   │   │   └── DatasetStatus.java
-│           │   │   ├── exception/DatasetNotFoundException.java
-│           │   │   ├── repository/DatasetRepository.java
-│           │   │   └── service/DatasetService.java
-│           │   │
-│           │   └── exception/
-│           │       ├── ErrorResponse.java
-│           │       └── GlobalExceptionHandler.java
-│           │
-│           └── resources/application.properties
-│
-├── datasets/
-├── docs/
-├── frontend/
-│   └── Request.http
-└── README.md
-```
+### 3. Dataset & Analysis Job Domain
+Implemented dataset and analysis-job management.
 
-Runtime/generated directories such as `.git`, `target`, and the Python `.venv` are not part of the conceptual source structure and should not be committed.
-
----
-
-## 3. Backend Layered Architecture
-
-The Spring Boot application follows:
-
-```text
-Controller
-    ↓
-Service
-    ↓
-Repository
-    ↓
-JPA / Hibernate
-    ↓
-PostgreSQL
-```
-
-### Controller
-
-Maps HTTP requests to application operations. It receives DTOs and returns DTOs/HTTP responses. It does not contain database/business logic.
-
-### Service
-
-Contains business logic and coordinates repositories and other services.
-
-### Repository
-
-Uses Spring Data JPA for persistence and custom database queries/locking.
-
-### Entity
-
-Represents persistent database state.
-
-### DTO
-
-Defines API contracts separately from database entities.
-
----
-
-## 4. Dataset Module
-
-### `Dataset`
-
-Maps to the `datasets` table and contains:
-
-| Field | Purpose |
-|---|---|
-| `id` | UUID primary key |
-| `name` | Dataset name |
-| `contentHash` | Content fingerprint |
-| `fileSize` | Size of dataset |
-| `fileType` | File type |
-| `status` | Dataset lifecycle |
-| `createdAt` | Registration timestamp |
-| `processedAt` | Processing completion timestamp |
-
-### Dataset status
-
-```text
-UPLOADED → PROCESSING → COMPLETED
-                    └──→ FAILED
-```
-
-The entity provides transition methods `markProcessing()`, `markCompleted()`, and `markFailed()`.
-
-### Duplicate detection
-
-`contentHash` is `NOT NULL` and `UNIQUE`. `DatasetRepository` exposes `findByContentHash()`.
-
-The service therefore performs:
-
-```text
-POST /api/datasets
-        ↓
-findByContentHash()
-        │
-   +----+----+
-   |         |
- Exists     New
-   |         |
- return   create
- existing  Dataset
-```
-
-This prevents duplicate registration of identical dataset content.
-
-### Dataset endpoints
-
-```http
-POST /api/datasets
-GET  /api/datasets/{id}
-GET  /api/datasets
-```
-
-Example create request:
-
-```json
-{
-  "name": "sales.csv",
-  "contentHash": "abc123...",
-  "fileSize": 1048576,
-  "fileType": "csv"
-}
-```
-
----
-
-## 5. Analysis Job Module
-
-`AnalysisJob` maps to `analysis_jobs`.
-
-```text
-Dataset 1 ───────< AnalysisJob
-```
-
-A dataset can have multiple independent analysis jobs, for example EDA, statistical analysis, and machine learning.
-
-### Job fields
-
-| Field | Purpose |
-|---|---|
-| `id` | Job identifier |
-| `dataset` | Dataset being analyzed |
-| `analysisType` | Requested analysis |
-| `status` | Job lifecycle |
-| `retryCount` | Failed attempt count |
-| `createdAt` | Queue time |
-| `startedAt` | Processing start |
-| `completedAt` | Completion/failure time |
-
-### Job states
-
-```text
-PENDING
-   ↓
-PROCESSING
-   ↓
-COMPLETED
-```
-
-Failure:
-
-```text
-PROCESSING → FAILED
-```
-
-Current retry count is incremented on failure, but automatic re-queue/retry policy is **not yet implemented**.
-
-### Analysis types
+Analysis types currently supported:
 
 ```text
 EDA
@@ -304,481 +61,270 @@ TIME_SERIES
 TEXT_ANALYSIS
 ```
 
-### Analysis job endpoints
+Analysis job lifecycle:
 
-```http
-POST /api/analysis/jobs
-GET  /api/analysis/jobs/{id}
+```text
+PENDING -> PROCESSING -> COMPLETED
+                                         -> FAILED -> PENDING (retry)
 ```
 
-Create request:
+`AnalysisJob` currently tracks:
+- job ID
+- dataset
+- analysis type
+- status
+- retry count
+- created/started/completed timestamps
+- error message
 
-```json
-{
-  "datasetId": "0978c4d6-37f0-4ecb-b00e-ea5b8d40ea9c",
-  "analysisType": "EDA"
-}
-```
-
-The service validates the dataset, creates a `PENDING` job, and saves it.
-
----
-
-## 6. Job Worker
-
-`AnalysisJobWorker` is a Spring `@Component` executed every 5 seconds using:
+### 4. Asynchronous Worker
+Implemented `AnalysisJobWorker` using:
 
 ```java
 @Scheduled(fixedDelay = 5000)
 ```
 
-The worker does not receive an HTTP request directly. It polls persistent job state.
+The worker:
+1. Finds the next pending job.
+2. Claims it.
+3. Marks it as `PROCESSING`.
+4. Calls the Python analysis service.
+5. Persists successful results.
+6. Handles failures.
 
-### Worker flow
-
-```text
-Every 5 seconds
-      ↓
-claimNextPendingJob()
-      ↓
-Find oldest PENDING job
-      ↓
-Pessimistic lock
-      ↓
-PENDING → PROCESSING
-      ↓
-Call Python
-      ↓
-COMPLETED / FAILED
-```
-
-### FIFO selection
-
-The repository query uses:
-
-```sql
-ORDER BY job.createdAt ASC
-```
-
-so the oldest pending job is selected first.
-
-### Database locking
-
-The query uses:
+Pending-job selection uses pessimistic locking:
 
 ```java
 @Lock(LockModeType.PESSIMISTIC_WRITE)
 ```
 
-This establishes the basis for preventing concurrent workers from claiming the same row.
+This introduced practical concepts around concurrency and job claiming.
 
----
+### 5. Java ↔ Python Integration
+Implemented the integration layer using:
+- `PythonAnalysisClient`
+- `PythonAnalysisResponse`
+- `PythonAnalysisException`
 
-## 7. Java → Python Integration
-
-Python-specific communication is isolated under:
-
-```text
-analysis/integration/python/
-```
-
-### `PythonAnalysisClient`
-
-Responsible for the HTTP call:
-
-```http
-POST http://127.0.0.1:8000/internal/analyze
-Content-Type: application/json
-```
-
-Request model:
-
-```json
-{
-  "jobId": "...",
-  "datasetId": "...",
-  "analysisType": "EDA"
-}
-```
-
-`PythonAnalysisClient` catches `RestClientException` and converts it to `PythonAnalysisException`, allowing the worker to handle service failures consistently.
-
-### `PythonClientConfig`
-
-Creates the Spring `RestClient` using the configured Python base URL and attaches `PythonRequestLoggingInterceptor`.
-
-### Logging interceptor
-
-During development it logs outgoing method, URI, headers, request body, and response status. This was used to diagnose the previous 422 issue and confirm the current request is actually reaching FastAPI as JSON.
-
----
-
-## 8. Python Analysis Engine
-
-The Python service is a separate FastAPI application:
+Flow:
 
 ```text
-analytics/
-├── app/
-│   ├── main.py
-│   └── api/
-│       └── analysis.py
-└── requirements.txt
+Java Spring Boot -> Python Analytics Service -> Java Spring Boot
 ```
 
-### `main.py`
+### 6. Python EDA Engine
+Implemented `EDAService` using Pandas.
 
-Creates the FastAPI application and registers the analysis router.
+Current EDA output includes:
 
-Health endpoint:
+**Dataset overview**
+- row count
+- column count
+- columns
 
-```http
-GET /health
-```
+**Data types**
+- detected dtype for every column
 
-Response:
+**Data quality**
+- missing-value counts
+- missing-value percentages
+- duplicate rows
 
-```json
-{
-  "status": "UP",
-  "service": "datamind-analysis"
-}
-```
+**Cardinality**
+- unique-value counts
 
-### `/internal/analyze`
+**Numerical statistics**
+- count
+- mean
+- standard deviation
+- min
+- 25%
+- 50%
+- 75%
+- max
 
-The endpoint currently accepts:
+**Categorical statistics**
+- unique count
+- top values
+- frequencies
+
+Categorical analysis currently supports:
 
 ```python
-class AnalysisRequest(BaseModel):
-    jobId: UUID
-    datasetId: UUID
-    analysisType: str
+["object", "category", "bool"]
 ```
 
-and returns an acknowledgement:
-
-```json
-{
-  "status": "RECEIVED",
-  "result": {
-    "jobId": "...",
-    "datasetId": "...",
-    "analysisType": "EDA"
-  },
-  "error": null
-}
-```
-
-**Important:** this is currently an integration stub. It does not yet load a dataset or perform actual EDA/ML computation.
-
----
-
-## 9. Complete End-to-End Pipeline
-
-For an EDA request:
+### 7. End-to-End EDA Test
+The complete pipeline has been successfully tested with a dataset containing:
 
 ```text
-1. Client
-      |
-      | POST /api/analysis/jobs
-      v
-2. AnalysisJobController
-      |
-      v
-3. AnalysisJobService
-      |
-      | validate dataset
-      | create PENDING job
-      v
-4. PostgreSQL
-      |
-      | analysis_jobs.status = PENDING
-      v
-5. AnalysisJobWorker
-      |
-      | scheduled every 5 sec
-      | claim oldest PENDING job
-      v
-6. PostgreSQL
-      |
-      | PENDING → PROCESSING
-      v
-7. PythonAnalysisClient
-      |
-      | POST /internal/analyze
-      v
-8. FastAPI
-      |
-      | Pydantic validation
-      | analysis execution (stub currently)
-      v
-9. PythonAnalysisResponse
-      |
-      v
-10. AnalysisJobWorker
-      |
-      +---- success ----> COMPLETED
-      |
-      └---- exception ---> FAILED
-             |
-             v
-11. PostgreSQL
+20 rows
+9 columns
 ```
 
-The client can then poll:
+The result correctly reported:
+- 0 duplicate rows
+- 0 missing values
+- missing percentages
+- unique-value counts
+- numerical statistics
+- categorical statistics
 
-```http
-GET /api/analysis/jobs/{jobId}
+The structured result was successfully persisted in PostgreSQL's `analysis_results` table.
+
+### 8. Retry Handling
+Basic retry handling is implemented with:
+
+```java
+private static final int MAX_RETRIES = 3;
 ```
 
-to observe the job state.
+The current implementation:
+- increments retry count
+- returns failed jobs to `PENDING` while retrying
+- clears previous error/completion state
+- eventually marks the job as `FAILED`
 
----
+Retry semantics will be refined later.
 
-## 10. Error Handling
+## What We Have Learned
 
-Centralized handling is provided by `GlobalExceptionHandler`.
+### Backend Engineering
+- Spring Boot
+- IoC / Dependency Injection
+- REST APIs
+- DTOs
+- service/repository architecture
+- scheduled workers
+- asynchronous job processing
+- exception handling
+- job state management
 
-Current domain exceptions include:
-
-```text
-DatasetNotFoundException
-AnalysisJobNotFoundException
-PythonAnalysisException
-```
-
-The REST API uses an `ErrorResponse` containing:
-
-```text
-status
-error
-message
-timestamp
-```
-
----
-
-## 11. Technology Stack
-
-### Java backend
-
-- Java 21
-- Spring Boot 4.1
-- Spring MVC
-- Spring Data JPA
-- Hibernate
-- Spring RestClient
-- Spring Scheduling
-- Jackson
-- Maven
-
-### Database
-
+### Database Engineering
 - PostgreSQL
+- JPA
+- Hibernate
+- entity relationships
+- transactions
+- UUIDs
+- JSON persistence
+- pessimistic locking
 
-### Python analytics service
-
-- Python
-- FastAPI
-- Pydantic
-- Uvicorn
+### Data Science / Data Engineering
 - Pandas
-- NumPy
-- Scikit-learn
+- DataFrame inspection
+- missing-value analysis
+- duplicate detection
+- cardinality analysis
+- descriptive statistics
+- categorical frequency analysis
+- dtype detection
+- structured EDA results
 
----
-
-## 12. Configuration
-
-`application.properties` currently contains:
-
-```properties
-spring.application.name=datamind-api
-
-spring.datasource.url=jdbc:postgresql://localhost:5432/datamind
-spring.datasource.username=postgres
-spring.datasource.password=${DB_PASSWORD}
-
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.format_sql=true
-
-datamind.python.base-url=http://127.0.0.1:8000
-```
-
-The database password is externalized through `DB_PASSWORD`. Do not commit credentials.
-
----
-
-## 13. Running Locally
-
-### PostgreSQL
-
-Create/run the `datamind` database on PostgreSQL `localhost:5432` and configure:
-
-```powershell
-$env:DB_PASSWORD="your_password"
-```
-
-### Python
-
-From `analytics/`:
-
-```powershell
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-
-FastAPI docs:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-### Spring Boot
-
-From `backend/datamind-api/`:
-
-```powershell
-.\mvnw.cmd spring-boot:run
-```
-
-API:
-
-```text
-http://localhost:8080
-```
-
----
-
-## 14. Current API Summary
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/datasets` | Register dataset |
-| GET | `/api/datasets/{id}` | Get dataset |
-| GET | `/api/datasets` | List datasets |
-| POST | `/api/analysis/jobs` | Create analysis job |
-| GET | `/api/analysis/jobs/{id}` | Get analysis job/status |
-| GET | `/health` | Python service health |
-| POST | `/internal/analyze` | Internal Java → Python call |
-
-The `/internal/analyze` endpoint is an internal service-to-service endpoint, not a frontend-facing API.
-
----
-
-## 15. Why the Job Worker Architecture?
-
-The system deliberately avoids making a user HTTP request wait for a potentially expensive data-science operation.
-
-Instead of:
-
-```text
-HTTP request → Python analysis → wait → response
-```
-
-DataMind uses:
-
-```text
-HTTP request
-    ↓
-Create persistent job
-    ↓
-Return job
-    ↓
-Worker executes asynchronously
-    ↓
-Client polls job status
-```
-
-This provides a foundation for:
-
-- long-running analysis
-- multiple workers
+### Distributed-System Concepts
+- Java ↔ Python service communication
+- service boundaries
+- worker-based processing
+- failure handling
 - retries
-- parallel processing
-- independent Python execution
-- queue/broker migration later
+- state transitions
 
-PostgreSQL is currently the persistent job source of truth. A dedicated broker such as RabbitMQ/Kafka can be introduced later if scale requires it.
+### Engineering Workflow
+- Git/GitHub
+- staged-diff review
+- meaningful commits
+- Postman API testing
+- direct PostgreSQL verification
 
----
+## Current Status
 
-## 16. Current Implementation Status
+| Component | Status |
+|---|---|
+| Spring Boot backend | Done |
+| PostgreSQL integration | Done |
+| Dataset domain | Done |
+| Analysis job domain | Done |
+| Job lifecycle | Done |
+| Scheduled worker | Done |
+| Java ↔ Python integration | Done |
+| Python EDA engine | Done |
+| Result persistence | Done |
+| End-to-end EDA test | Done |
+| Basic retry handling | Done |
+| Analysis Result API | **Next** |
 
-### Implemented
+## Next Milestone — Analysis Result API
 
-- [x] Spring Boot backend
-- [x] PostgreSQL/JPA persistence
-- [x] Dataset registration
-- [x] Duplicate detection using content hash
-- [x] Dataset lifecycle model
-- [x] Analysis job creation
-- [x] Persistent analysis jobs
-- [x] Job status lifecycle
-- [x] Scheduled analysis worker
-- [x] Oldest-pending-job selection
-- [x] Pessimistic database locking
-- [x] Java → FastAPI HTTP integration
-- [x] Python request/response contract
-- [x] FastAPI health endpoint
-- [x] Centralized exception handling
-- [x] Python request logging
+The next milestone is to expose persisted analysis results through the Spring Boot API.
 
-### Not yet implemented
-
-- [ ] Real EDA execution
-- [ ] Dataset file loading in Python
-- [ ] Statistical analysis
-- [ ] Machine-learning pipeline
-- [ ] Time-series analysis
-- [ ] Text analysis
-- [ ] Persistent analysis result storage
-- [ ] Result retrieval API
-- [ ] Automatic retry/requeue policy
-- [ ] Production-grade worker concurrency controls
-- [ ] Authentication/authorization
-- [ ] File upload/storage pipeline
-- [ ] Frontend
-- [ ] Production deployment/observability
-
----
-
-## 17. Next Major Pipeline: Real EDA
-
-The current Python acknowledgement should eventually become:
+Planned flow:
 
 ```text
-AnalysisJob
-    ↓
-Worker
-    ↓
-Python
-    ↓
-Load dataset
-    ↓
-Validate schema
-    ↓
-Profile columns
-    ↓
-Missing-value analysis
-    ↓
-Duplicate analysis
-    ↓
-Descriptive statistics
-    ↓
-Outlier detection
-    ↓
-Correlation analysis
-    ↓
-Distribution analysis
-    ↓
-Generate structured analysis result
-    ↓
-Persist result
-    ↓
-COMPLETED
+Client
+  |
+  v
+AnalysisResultController
+  |
+  v
+AnalysisResultService
+  |
+  v
+AnalysisResultRepository
+  |
+  v
+PostgreSQL
+  |
+  v
+Result DTO
+  |
+  v
+Client
 ```
 
-That will turn the current integration skeleton into the first real DataMind intelligence pipeline.
+### Planned tasks
+
+1. Implement `AnalysisResultRepository`.
+2. Implement `AnalysisResultService`.
+3. Create result DTOs.
+4. Create `AnalysisResultController`.
+5. Add an endpoint to fetch results by job ID.
+6. Add an endpoint to fetch analysis-job status.
+7. Add proper exception handling.
+8. Test with Postman.
+9. Verify responses against PostgreSQL.
+10. Commit the milestone.
+
+This will complete the core:
+
+```text
+SUBMIT -> PROCESS -> PERSIST -> RETRIEVE
+```
+
+## Long-Term Roadmap
+
+```text
+[✓] Backend Foundation
+[✓] Database + Dataset Management
+[✓] Analysis Job System
+[✓] Java ↔ Python Pipeline
+[✓] EDA Engine
+[✓] Async Worker + Result Persistence
+[ ] Analysis Result API          <- NEXT
+[ ] Frontend / Analysis Dashboard
+[ ] Statistical Analysis
+[ ] Machine Learning Pipeline
+[ ] Time-Series Analysis
+[ ] Text Analysis
+[ ] Authentication & Authorization
+[ ] Production Hardening
+[ ] Deployment + Observability
+[ ] AI / GenAI Data Intelligence
+```
+
+## Project Vision
+
+DataMind is intended to grow beyond a simple EDA application into an **Autonomous Data Intelligence Platform**.
+
+The long-term goal is to build a system that can understand a dataset, select appropriate analysis workflows, execute them, persist structured results, and eventually generate actionable insights for users.
+
+The project is being developed incrementally so that every milestone adds both a meaningful product capability and practical software-engineering knowledge.
