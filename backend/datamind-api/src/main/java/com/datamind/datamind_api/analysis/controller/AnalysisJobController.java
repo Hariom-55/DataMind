@@ -31,7 +31,9 @@ public class AnalysisJobController
                 request.getAnalysisType()
         );
 
-        return ResponseEntity.ok(
+        return ResponseEntity
+                .accepted()
+                .body(
                 new AnalysisJobResponse(analysisJob)
         );
 
