@@ -1,10 +1,13 @@
 package com.datamind.datamind_api.analysis.dto;
 
 import com.datamind.datamind_api.analysis.entity.enums.AnalysisType;
+import jakarta.validation.constraints.NotNull;
+
 
 import java.util.UUID;
 public class CreateAnalysisJobRequest
 {
+    @NotNull
     private UUID datasetId;
     private AnalysisType analysisType ;
 

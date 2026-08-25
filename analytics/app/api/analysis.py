@@ -4,9 +4,14 @@ from pathlib import Path
 from fastapi import APIRouter,HTTPException
 from pydantic import BaseModel 
 from app.services.eda_service import EDAService
+from app.services.statistical_service import StatisticalAnalysisService
+
+
 
 router = APIRouter()
 eda_service = EDAService()
+statistical_service = StatisticalAnalysisService()
+
 
 class AnalysisRequest(BaseModel):
     jobId: UUID
@@ -25,24 +30,39 @@ def analyze(request: AnalysisRequest):
             detail="Dataset file not found"
         )
 
-    if request.analysisType != "EDA":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported analysis type :{request.analysisType}"
-        )
-
     try:
-        result = eda_service.analyze(str(dataset_path))
 
-        return {
-            "status": "COMPLETED",
-            "result": result,
-            "error":None
-        }
+        if request.analysisType == "EDA":
+
+            result = eda_service.analyze(
+                str(dataset_path)
+            )
+
+        elif request.analysisType == "STATISTICAL":
+
+            result = statistical_service.analyze(
+                str(dataset_path)
+            )
+
+        else:
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported analysis type: {request.analysisType}"
+            )
+
+    except HTTPException:
+        raise
 
     except Exception as ex:
         raise HTTPException(
             status_code=500,
             detail=str(ex)
         )
+
+    return {
+        "status": "COMPLETED",
+        "result":result,
+        "error": None
+    }
 

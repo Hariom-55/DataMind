@@ -8,6 +8,7 @@ import com.datamind.datamind_api.analysis.service.AnalysisJobService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("api/analysis/jobs")
@@ -23,7 +24,7 @@ public class AnalysisJobController
 
     @PostMapping
     public ResponseEntity<AnalysisJobResponse> createAnalysisJob(
-            @RequestBody CreateAnalysisJobRequest request
+           @Valid @RequestBody CreateAnalysisJobRequest request
             ){
         AnalysisJob analysisJob = analysisJobService.createAnalysisJob(
                 request.getDatasetId(),

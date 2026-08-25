@@ -136,6 +136,7 @@ public class AnalysisJob
     {
         this.status = AnalysisJobStatus.PENDING;
         this.completedAt = null;
+        this.startedAt = null ;
         this.errorMessage = null;
     }
 }

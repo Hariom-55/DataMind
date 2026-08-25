@@ -17,6 +17,7 @@ public class AnalysisJobResponse
     private LocalDateTime startedAt;
     private LocalDateTime completedAt;
     private String errorMessage;
+    private Integer retryCount;
 
     public AnalysisJobResponse(AnalysisJob analysisJob)
     {
@@ -28,6 +29,7 @@ public class AnalysisJobResponse
         this.startedAt = analysisJob.getStartedAt();
         this.completedAt = analysisJob.getCompletedAt();
         this.errorMessage = analysisJob.getErrorMessage();
+        this.retryCount = analysisJob.getRetryCount();
 
     }
 
@@ -62,5 +64,10 @@ public class AnalysisJobResponse
     public String getErrorMessage()
     {
         return errorMessage;
+    }
+
+    public Integer getRetryCount()
+    {
+        return retryCount;
     }
 }
