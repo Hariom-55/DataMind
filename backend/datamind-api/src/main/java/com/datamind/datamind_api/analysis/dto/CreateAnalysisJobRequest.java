@@ -9,6 +9,8 @@ public class CreateAnalysisJobRequest
 {
     @NotNull
     private UUID datasetId;
+
+    @NotNull
     private AnalysisType analysisType ;
 
     public CreateAnalysisJobRequest() {}
