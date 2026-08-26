@@ -57,7 +57,8 @@ public class AnalysisJobService
     public Optional<AnalysisJob> claimNextPendingJob()
     {
         Optional<AnalysisJob> job = analysisJobRepository.findNextPendingJob(
-                AnalysisJobStatus.PENDING
+                AnalysisJobStatus.PENDING.name()
+                
         );
 
         job.ifPresent( analysisJob -> {

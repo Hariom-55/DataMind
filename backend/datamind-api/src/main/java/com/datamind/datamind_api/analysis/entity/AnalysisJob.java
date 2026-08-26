@@ -139,4 +139,9 @@ public class AnalysisJob
         this.startedAt = null ;
         this.errorMessage = null;
     }
+
+    public void setCreatedAt(LocalDateTime createdAt)
+    {
+        this.createdAt = createdAt;
+    }
 }

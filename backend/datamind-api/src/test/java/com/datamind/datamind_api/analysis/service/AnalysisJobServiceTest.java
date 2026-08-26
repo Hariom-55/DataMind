@@ -103,7 +103,7 @@ public class AnalysisJobServiceTest {
         AnalysisJob job = mock(AnalysisJob.class);
 
         when(analysisJobRepository.findNextPendingJob(
-                AnalysisJobStatus.PENDING
+                AnalysisJobStatus.PENDING.name()
         ))
                 .thenReturn(Optional.of(job));
 
@@ -114,7 +114,7 @@ public class AnalysisJobServiceTest {
         assertSame(job, result.get());
 
         verify(analysisJobRepository)
-                .findNextPendingJob(AnalysisJobStatus.PENDING);
+                .findNextPendingJob(AnalysisJobStatus.PENDING.name());
 
         verify(job)
                 .markAsProcessing();
@@ -127,7 +127,7 @@ public class AnalysisJobServiceTest {
     void shouldReturnEmptyWhenNoPendingJobExists()
     {
         when(analysisJobRepository.findNextPendingJob(
-                AnalysisJobStatus.PENDING
+                AnalysisJobStatus.PENDING.name()
         )).thenReturn(Optional.empty());
 
         Optional<AnalysisJob> result =
@@ -136,7 +136,7 @@ public class AnalysisJobServiceTest {
         assertTrue(result.isEmpty());
 
         verify(analysisJobRepository)
-                .findNextPendingJob(AnalysisJobStatus.PENDING);
+                .findNextPendingJob(AnalysisJobStatus.PENDING.name());
 
         verify(analysisJobRepository, never())
                 .save(any());
