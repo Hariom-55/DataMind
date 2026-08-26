@@ -200,4 +200,49 @@ public class AnalysisJobControllerTest
     }
 
 
+    @Test
+    void shouldReturn404WhenAnalysisJobNotFound() throws Exception
+    {
+        UUID jobId = UUID.randomUUID();
+
+        when(analysisJobService.getAnalysisJobById(jobId))
+                .thenThrow(
+                        new AnalysisJobNotFoundException(
+                                "Analysis job not found: " + jobId
+                        )
+                );
+
+        mockMvc.perform(
+                        get("/api/analysis/jobs/{id}", jobId)
+                )
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error")
+                        .value("ANALYSIS_JOB_NOT_FOUND"));
+    }
+
+
+    @Test
+    void shouldRejectMalformedJson() throws Exception
+    {
+        String requestBody = """
+            {
+                "datasetId": "%s",
+                "analysisType": "EDA"
+            """.formatted(UUID.randomUUID());
+
+        mockMvc.perform(
+                        post("/api/analysis/jobs")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestBody)
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error")
+                        .value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.message")
+                        .value("Request body contains invalid or malformed data"));
+    }
+
+
 }

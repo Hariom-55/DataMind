@@ -11,7 +11,7 @@ import java.util.UUID;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("api/analysis/jobs")
+@RequestMapping("/api/analysis/jobs")
 public class AnalysisJobController
 {
     private final AnalysisJobService analysisJobService ;
