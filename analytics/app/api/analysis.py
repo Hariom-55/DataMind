@@ -2,10 +2,11 @@
 from uuid import UUID
 from pathlib import Path
 from fastapi import APIRouter,HTTPException
-from pydantic import BaseModel 
+
+from app.models.analysis_request import AnalysisRequest
 from app.services.eda_service import EDAService
 from app.services.statistical_service import StatisticalAnalysisService
-
+from app.models.analysis_response import AnalysisResponse
 
 
 router = APIRouter()
@@ -13,11 +14,7 @@ eda_service = EDAService()
 statistical_service = StatisticalAnalysisService()
 
 
-class AnalysisRequest(BaseModel):
-    jobId: UUID
-    datasetId: UUID
-    analysisType: str
-    datasetPath: str
+
 
 @router.post("/internal/analyze")
 def analyze(request: AnalysisRequest):

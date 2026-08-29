@@ -27,10 +27,14 @@ class EDAService :
         }
 
         #5.Missing Value Percentage
+        row_count = len(df)
+
         missing_percentages = {
-            column : float(round((count/len(df))*100,2))
-            if len(df) > 0
-            else 0.0
+            column : ( 
+                float(round((count/row_count)*100,2))
+                if row_count > 0
+                else 0.0
+            )
             for column, count in df.isnull().sum().items()
         }
 
@@ -54,14 +58,16 @@ class EDAService :
             numeric_statistics = {
                 column : {
                     statistics : float(value)
-                    for statistics , value in statistics[column].items()
+                    for statistics , value 
+                    in statistics[column].items()
+                    if pd.notna(value)
                 }
                 for column in numeric_df.columns
             }
 
         #9. Categorical Statistics 
         categorical_df = df.select_dtypes(
-            include=["object", "category","bool"]
+            include=["object","str", "category","bool"]
         )
 
         categorical_statistics = {} 

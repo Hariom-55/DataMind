@@ -1,0 +1,8 @@
+from enum import Enum
+
+class AnalysisType(str, Enum):
+    EDA = "EDA"
+    STATISTICAL = "STATISTICAL"
+    MACHINE_LEARNING = "MACHINE_LEARNING"
+    TIME_SERIES = "TIME_SERIES"
+    TEXT_ANALYSIS = "TEXT_ANALYSIS"
