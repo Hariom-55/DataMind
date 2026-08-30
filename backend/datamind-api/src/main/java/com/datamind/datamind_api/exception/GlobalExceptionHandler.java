@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler
@@ -43,6 +44,18 @@ public class GlobalExceptionHandler
                 400,
                 "INVALID_REQUEST",
                 exception.getMessage()
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMissingServletRequestPart(
+            MissingServletRequestPartException exception
+    ){
+        return new ErrorResponse(
+                400,
+                "INVALID_REQUEST",
+                "Dataset file is required"
         );
     }
 
