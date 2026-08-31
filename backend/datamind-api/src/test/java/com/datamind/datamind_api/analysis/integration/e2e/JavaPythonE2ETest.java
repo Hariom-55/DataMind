@@ -288,4 +288,214 @@ class JavaPythonE2ETest
                         .isEmpty()
         );
     }
+
+    @Test
+    void shouldCompleteStatisticalAnalysisJobThroughPython()
+    {
+        Dataset dataset = new Dataset(
+                "statistical-e2e.csv",
+                "e2e-statistical-" + UUID.randomUUID(),
+                0L,
+                "text/csv"
+        );
+
+        Path datasetPath;
+
+        try
+        {
+            datasetPath = Files.createTempFile(
+                    "datamind-statistical-e2e-",
+                    ".csv"
+            );
+
+            Files.writeString(
+                    datasetPath,
+                    """
+                    age,salary
+                    20,20000
+                    30,30000
+                    40,40000
+                    50,50000
+                    60,60000
+                    """
+            );
+
+            dataset.setStoragePath(
+                    datasetPath.toAbsolutePath().toString()
+            );
+
+            dataset = datasetRepository.saveAndFlush(dataset);
+
+            AnalysisJob job = new AnalysisJob(
+                    dataset,
+                    AnalysisType.STATISTICAL,
+                    AnalysisJobStatus.PENDING
+            );
+
+            job = analysisJobRepository.saveAndFlush(job);
+
+            UUID jobId = job.getId();
+
+            // Act
+            analysisJobWorker.processPendingJob();
+
+            // Assert
+            AnalysisJob completedJob =
+                    analysisJobRepository
+                            .findById(jobId)
+                            .orElseThrow();
+
+            assertEquals(
+                    AnalysisJobStatus.COMPLETED,
+                    completedJob.getStatus()
+            );
+
+            AnalysisResult result =
+                    analysisResultRepository
+                            .findByJobId(jobId)
+                            .orElseThrow();
+
+            assertNotNull(result);
+            assertNotNull(result.getResultData());
+
+            Map<String, Object> resultData =
+                    result.getResultData();
+
+            assertTrue(
+                    resultData.containsKey("descriptiveStatistics")
+            );
+
+            assertTrue(
+                    resultData.containsKey("correlations")
+            );
+
+            Map<String, Object> descriptiveStatistics =
+                    (Map<String, Object>)
+                            resultData.get("descriptiveStatistics");
+
+            assertTrue(
+                    descriptiveStatistics.containsKey("age")
+            );
+
+            assertTrue(
+                    descriptiveStatistics.containsKey("salary")
+            );
+
+            Map<String, Object> ageStatistics =
+                    (Map<String, Object>)
+                            descriptiveStatistics.get("age");
+
+            assertEquals(
+                    5,
+                    ((Number) ageStatistics.get("count")).intValue()
+            );
+
+            assertEquals(
+                    40.0,
+                    ((Number) ageStatistics.get("mean")).doubleValue(),
+                    0.001
+            );
+
+            Map<String, Object> correlations =
+                    (Map<String, Object>)
+                            resultData.get("correlations");
+
+            assertTrue(
+                    correlations.containsKey("pearson")
+            );
+
+            assertTrue(
+                    correlations.containsKey("spearman")
+            );
+
+            Map<String, Object> pearson =
+                    (Map<String, Object>)
+                            correlations.get("pearson");
+
+            Map<String, Object> agePearson =
+                    (Map<String, Object>)
+                            pearson.get("age");
+
+            assertEquals(
+                    1.0,
+                    ((Number) agePearson.get("salary")).doubleValue(),
+                    0.001
+            );
+        }
+        catch (Exception exception)
+        {
+            throw new RuntimeException(exception);
+        }
+
+    }
+
+    @Test
+void shouldRetryStatisticalAnalysisJobWhenPythonCannotFindDataset()
+{
+    // Arrange
+    Dataset dataset = new Dataset(
+            "missing-statistical-dataset.csv",
+            "e2e-statistical-missing-" + UUID.randomUUID(),
+            100L,
+            "text/csv"
+    );
+
+    dataset.setStoragePath(
+            Path.of(
+                    System.getProperty("java.io.tmpdir"),
+                    "datamind-statistical-missing-" +
+                            UUID.randomUUID() +
+                            ".csv"
+            ).toString()
+    );
+
+    dataset = datasetRepository.saveAndFlush(dataset);
+
+    AnalysisJob job = new AnalysisJob(
+            dataset,
+            AnalysisType.STATISTICAL,
+            AnalysisJobStatus.PENDING
+    );
+
+    job = analysisJobRepository.saveAndFlush(job);
+
+    UUID jobId = job.getId();
+
+    // Act
+    analysisJobWorker.processPendingJob();
+
+    // Assert
+    AnalysisJob retriedJob =
+            analysisJobRepository
+                    .findById(jobId)
+                    .orElseThrow();
+
+    assertEquals(
+            AnalysisJobStatus.PENDING,
+            retriedJob.getStatus()
+    );
+
+    assertEquals(
+            1,
+            retriedJob.getRetryCount()
+    );
+
+    assertNull(
+            retriedJob.getErrorMessage()
+    );
+
+    assertNull(
+            retriedJob.getStartedAt()
+    );
+
+    assertNull(
+            retriedJob.getCompletedAt()
+    );
+
+    assertTrue(
+            analysisResultRepository
+                    .findByJobId(jobId)
+                    .isEmpty()
+    );
+}
 }

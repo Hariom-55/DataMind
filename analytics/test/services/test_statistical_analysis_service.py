@@ -1,6 +1,5 @@
 import pandas as pd
 import pytest
-
 from app.services.statistical_service import StatisticalAnalysisService
 
 

@@ -1,6 +1,5 @@
 import pandas as pd
 import pytest
-
 from app.services.eda_service import EDAService
 
 
