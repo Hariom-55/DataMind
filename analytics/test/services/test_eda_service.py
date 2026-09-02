@@ -2,13 +2,18 @@ import pandas as pd
 import pytest
 from app.services.eda_service import EDAService
 from app.loaders.dataset_loader import DatasetLoader
+from app.services.data_quality_service import DataQualityService
 
 
 class TestEDAService:
 
     def setup_method(self):
         dataset_loader = DatasetLoader()
-        self.service = EDAService(dataset_loader)
+        data_quality_service = DataQualityService()
+        self.service = EDAService(
+            dataset_loader,
+            data_quality_service
+        )
 
     def test_should_return_basic_dataset_overview(self, tmp_path):
 
@@ -162,6 +167,9 @@ class TestEDAService:
         dataset.to_csv(file_path, index=False)
 
         result = self.service.analyze(str(file_path))
+
+        assert "dataQuality" in result
+        assert result["dataQuality"]["score"] == 0.0
 
         assert result["overview"]["rowCount"] == 0
         assert result["overview"]["columnCount"] == 2

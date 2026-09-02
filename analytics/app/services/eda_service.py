@@ -1,11 +1,17 @@
 import pandas as pd 
 from app.loaders.dataset_loader import DatasetLoader
 from app.services.analysis_service import AnalysisService
+from app.services.data_quality_service import DataQualityService
 class EDAService(AnalysisService): 
 
-    def __init__(self, dataset_loader: DatasetLoader):
-        self.dataset_loader = dataset_loader
-        
+    def __init__(
+            self,
+            dataset_loader: DatasetLoader,
+            data_quality_service: DataQualityService
+            ):
+            self.dataset_loader = dataset_loader
+            self.data_quality_service = data_quality_service
+
     def analyze(self, dataset_path: str, file_type: str | None = None)->dict:
 
         #1.Load Dataset
@@ -51,6 +57,7 @@ class EDAService(AnalysisService):
 
         #7. Duplicate rows
         duplicate_rows = int(df.duplicated().sum())
+        data_quality = self.data_quality_service.analyze(df, duplicate_rows)
 
         #8. Numerical statistics
         numeric_df = df.select_dtypes(include="number")
@@ -103,4 +110,5 @@ class EDAService(AnalysisService):
             "duplicateRows": duplicate_rows,
             "numericStatistics": numeric_statistics,
             "categoricalStatistics": categorical_statistics,
+            "dataQuality": data_quality,
         }

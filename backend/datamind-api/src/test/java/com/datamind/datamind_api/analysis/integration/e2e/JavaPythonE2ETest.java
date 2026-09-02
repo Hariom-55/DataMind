@@ -1,9 +1,9 @@
 package com.datamind.datamind_api.analysis.integration.e2e;
 
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
-import java.io.OutputStream;
 import java.util.UUID;
 
 import org.apache.poi.ss.usermodel.Row;
@@ -122,6 +122,36 @@ class JavaPythonE2ETest
             assertNotNull(
                     resultData.get("overview")
             );
+            
+            @SuppressWarnings("unchecked")
+            Map<String, Object> dataQuality =
+                    (Map<String, Object>)
+                            resultData.get("dataQuality");
+
+                assertNotNull(dataQuality);
+
+                assertEquals(
+                        100.0,
+                        ((Number) dataQuality.get("score")).doubleValue(),
+                        0.001
+                );
+
+                assertEquals(
+                        100.0,
+                        ((Number) dataQuality.get("completeness")).doubleValue(),
+                        0.001
+                );
+
+                assertEquals(
+                        0,
+                        ((Number) dataQuality.get("missingCells")).intValue()
+                );
+
+                assertEquals(
+                        0,
+                        ((Number) dataQuality.get("duplicateRows")).intValue()
+                );
+ 
         }
         finally
         {

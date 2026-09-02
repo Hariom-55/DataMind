@@ -8,11 +8,13 @@ from app.services.eda_service import EDAService
 from app.services.statistical_service import StatisticalAnalysisService
 from app.services.analysis_registry import AnalysisRegistry
 from app.loaders.dataset_loader import DatasetLoader
+from app.services.data_quality_service import DataQualityService
 
 router = APIRouter()
 
 dataset_loader = DatasetLoader()
-eda_service = EDAService(dataset_loader)
+data_quality_service = DataQualityService()
+eda_service = EDAService(dataset_loader, data_quality_service)
 statistical_service = StatisticalAnalysisService(dataset_loader)
 analysis_registry = AnalysisRegistry()
 
