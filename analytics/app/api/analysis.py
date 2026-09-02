@@ -9,6 +9,7 @@ from app.services.statistical_service import StatisticalAnalysisService
 from app.services.analysis_registry import AnalysisRegistry
 from app.loaders.dataset_loader import DatasetLoader
 from app.services.data_quality_service import DataQualityService
+from app.services.ml_analysis_service import MLAnalysisService
 
 router = APIRouter()
 
@@ -17,6 +18,7 @@ data_quality_service = DataQualityService()
 eda_service = EDAService(dataset_loader, data_quality_service)
 statistical_service = StatisticalAnalysisService(dataset_loader)
 analysis_registry = AnalysisRegistry()
+ml_analysis_service = MLAnalysisService(dataset_loader)
 
 analysis_registry.register(
     "EDA",
@@ -28,6 +30,10 @@ analysis_registry.register(
     statistical_service
 )
 
+analysis_registry.register(
+    "MACHINE_LEARNING",
+    ml_analysis_service
+)
 
 @router.post("/internal/analyze")
 def analyze(request: AnalysisRequest):
