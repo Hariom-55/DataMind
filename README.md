@@ -9,7 +9,8 @@ The system separates application orchestration from data-science workloads:
 - **Java + Spring Boot** — backend API, persistence, orchestration, job management
 - **Python + FastAPI** — data analysis and machine-learning workloads
 - **PostgreSQL** — persistent application state
-- **pandas** — exploratory data analysis
+- **pandas** — dataset loading, exploratory data analysis, statistical analysis
+- **scikit-learn** — machine-learning preprocessing, modeling, and evaluation
 - **REST/HTTP** — Java ↔ Python communication
 
 ---
@@ -58,9 +59,10 @@ DataMind is being developed incrementally, with architecture, testing, reliabili
            Java                         FastAPI
              │                             │
              ├── Dataset Management        ├── Analysis API
-             ├── Analysis Jobs             ├── EDA Engine
-             ├── Worker                    └── Future ML/AI
-             └── Orchestration
+             ├── Analysis Jobs             ├── Dataset Loader
+             ├── Worker                    ├── EDA Engine
+             └── Orchestration              ├── Statistical Engine
+                                            └── ML Engine
                     │
                     │ HTTP / REST
                     ▼
@@ -384,7 +386,8 @@ An analysis request contains information such as:
   "jobId": "...",
   "datasetId": "...",
   "analysisType": "EDA",
-  "datasetPath": "..."
+  "datasetPath": "...",
+  "fileType": "text/csv"
 }
 ```
 
@@ -418,7 +421,131 @@ The structured result is returned through FastAPI to the Java service and persis
 
 ---
 
-# Phase 8 — Centralized Exception Handling
+# Phase 8 — Multi-Format Dataset Loading & Data Quality Profiling
+
+The analytics layer was refactored so analysis services no longer depend directly on `pandas.read_csv()`.
+
+A centralized `DatasetLoader` now supports:
+
+- CSV
+- XLSX
+- XLS
+- JSON
+- Parquet
+
+The loader accepts the dataset path and optional MIME type. When a recognized MIME type is available, it is preferred; otherwise the file extension is used as a fallback.
+
+This makes dataset loading reusable across EDA, statistical analysis, and machine-learning workloads.
+
+## Data Quality Profiling
+
+The EDA layer now produces a structured data-quality profile including:
+
+- missing-value counts
+- missing-value percentages
+- unique-value counts
+- duplicate-row count
+- numeric statistics
+- categorical statistics
+- data-quality score
+- completeness information
+
+The data-quality calculation is also covered by service and end-to-end tests.
+
+An XLSX dataset has been validated through the real Java → Python E2E pipeline, proving that non-CSV datasets can pass through storage, job processing, Python loading, analysis, and result persistence.
+
+---
+
+# Phase 9 — Machine Learning Foundation
+
+DataMind has now entered the Machine Learning implementation phase.
+
+The initial ML service is designed around supervised learning. A user supplies a target column and the service validates the dataset before determining the baseline problem type.
+
+The current ML flow is:
+
+```text
+Dataset
+   ↓
+Target Column
+   ↓
+Validation
+   ↓
+Problem-Type Detection
+   ├── Classification
+   └── Regression
+           ↓
+     Preprocessing
+           ↓
+     Train/Test Split
+           ↓
+       Baseline Model
+           ↓
+       Predictions
+           ↓
+        Metrics
+```
+
+## Current ML capabilities
+
+### Target Validation
+
+The ML service validates:
+
+- target-column presence
+- non-empty dataset
+- usable target values
+- minimum target observations
+- presence of feature columns
+
+### Problem-Type Detection
+
+The current baseline heuristic is:
+
+```text
+Non-numeric target
+       ↓
+Classification
+
+Numeric target
+   ├── exactly 2 unique values → Classification
+   └── otherwise              → Regression
+```
+
+This is intentionally treated as a baseline heuristic. Future versions will allow explicit user selection of classification or regression.
+
+### Preprocessing
+
+The ML pipeline currently supports heterogeneous datasets through scikit-learn:
+
+- numeric features → median imputation
+- categorical features → most-frequent imputation
+- categorical features → one-hot encoding
+- `ColumnTransformer` → combines feature-specific preprocessing
+- `Pipeline` → keeps preprocessing and model training together
+
+### Baseline Models
+
+| Problem Type | Baseline Model | Current Metrics |
+|---|---|---|
+| Classification | Logistic Regression | Accuracy |
+| Regression | Linear Regression | MAE, MSE, RMSE |
+
+The baseline approach is deliberately simple. It establishes a reference point before adding more complex models.
+
+### ML Reliability Work
+
+Classification training is being hardened with stratified train/test splitting and validation for classes with insufficient observations.
+
+The ML service has dedicated unit tests covering validation, problem-type detection, classification training, regression training, and failure cases.
+
+## ML Theory Notes
+
+A separate Machine Learning theory pack has been prepared alongside the implementation. It covers the concepts used in DataMind and the next stages of development, including supervised learning, preprocessing, model evaluation, cross-validation, class imbalance, feature engineering, hyperparameter tuning, and model persistence.
+
+---
+
+# Phase 10 — Centralized Exception Handling
 
 DataMind uses a centralized Spring `@RestControllerAdvice` for API-level exception handling.
 
@@ -626,8 +753,8 @@ This verifies that permanently failing analysis jobs do not enter an infinite re
 The current Java backend test suite contains:
 
 ```text
-61 tests
-61 passed
+64 tests
+64 passed
 0 failures
 0 errors
 0 skipped
@@ -645,11 +772,11 @@ Run the complete regression suite with:
 mvnw.cmd test
 ```
 
-The current `61/61` result is the baseline for the project at this milestone.
+The current `64/64` result is the baseline for the project at this milestone.
 
 ---
 
-# Current Milestone
+# Completed Milestone
 
 ## Milestone 1 — Core Analysis Pipeline + E2E Testing Foundation
 
@@ -674,6 +801,11 @@ The current `61/61` result is the baseline for the project at this milestone.
 - [x] Python analysis client
 - [x] FastAPI analysis service
 - [x] EDA execution using pandas
+- [x] Multi-format dataset loading
+- [x] MIME-type-aware dataset loading
+- [x] Data quality profiling
+- [x] Statistical analysis
+- [x] Analysis registry
 - [x] Analysis result persistence
 - [x] Retry mechanism
 - [x] Retry exhaustion handling
@@ -695,7 +827,49 @@ The current `61/61` result is the baseline for the project at this milestone.
 - [x] Java ↔ Python E2E happy-path test
 - [x] Java ↔ Python failure-path test
 - [x] Retry exhaustion E2E test
-- [x] Full regression suite: 61/61 passing
+- [x] Full Java regression suite: 64/64 passing
+- [x] Full Python regression suite passing
+
+---
+
+# Current Milestone
+
+## Milestone 2 — Analytics Expansion + ML Foundation
+
+**Status: In Progress**
+
+### Dataset Analytics
+
+- [x] Multi-format dataset loading
+- [x] MIME-type-aware loading
+- [x] EDA data-quality profiling
+- [x] Statistical analysis service
+- [x] Analysis registry
+
+### Machine Learning
+
+- [x] ML service foundation
+- [x] Target-column validation
+- [x] Classification/regression detection baseline
+- [x] Numeric feature imputation
+- [x] Categorical feature imputation
+- [x] One-hot encoding
+- [x] `ColumnTransformer` preprocessing
+- [x] Scikit-learn `Pipeline` integration
+- [x] Logistic Regression baseline
+- [x] Linear Regression baseline
+- [x] Classification accuracy
+- [x] Regression MAE/MSE/RMSE
+- [x] Classification split safeguards
+- [ ] Cross-validation
+- [ ] Advanced classification metrics
+- [ ] Model comparison
+- [ ] Class-imbalance handling
+- [ ] Feature engineering
+- [ ] Hyperparameter tuning
+- [ ] Model persistence
+- [ ] ML API integration
+- [ ] Java ↔ Python ML E2E validation
 
 ---
 
@@ -744,13 +918,18 @@ The current `61/61` result is the baseline for the project at this milestone.
                      FastAPI
                            │
                            ▼
-                      EDAService
+                  Analysis Registry
+                           │
+              ┌────────────┼────────────┐
+              ▼            ▼            ▼
+          EDAService   Statistical    ML Service
+              │         Service          │
+              └────────────┼────────────┘
+                           ▼
+                    DatasetLoader
                            │
                            ▼
-                         pandas
-                           │
-                           ▼
-                    EDA Result
+                    Analysis Result
                            │
                            ▼
                      Java Backend
@@ -797,12 +976,32 @@ The next stages of DataMind will expand the analysis platform.
 
 ## Analysis Capabilities
 
-- [ ] Statistical analysis
-- [ ] Machine learning analysis
+- [x] Statistical analysis
+- [ ] Machine learning analysis (API integration in progress)
 - [ ] Time-series analysis
 - [ ] Text analysis
-- [ ] Advanced dataset profiling
+- [x] Advanced dataset profiling
 - [ ] Automated feature analysis
+
+## Machine Learning
+
+- [x] ML service foundation
+- [x] Target-column validation
+- [x] Classification/regression detection baseline
+- [x] Numeric/categorical preprocessing
+- [x] Logistic Regression baseline
+- [x] Linear Regression baseline
+- [x] Baseline evaluation metrics
+- [x] Stratified classification split safeguards
+- [ ] Cross-validation
+- [ ] Precision / recall / F1 / confusion matrix
+- [ ] Model comparison
+- [ ] Class-imbalance strategies
+- [ ] Feature engineering framework
+- [ ] Hyperparameter tuning
+- [ ] Model persistence
+- [ ] ML API integration
+- [ ] Java ↔ Python ML E2E validation
 
 ## Intelligence Layer
 
