@@ -1,12 +1,13 @@
 import pandas as pd
 import pytest
 from app.services.statistical_service import StatisticalAnalysisService
-
+from app.loaders.dataset_loader import DatasetLoader
 
 class TestStatisticalAnalysisService:
 
     def setup_method(self):
-        self.service = StatisticalAnalysisService()
+        dataset_loader = DatasetLoader()
+        self.service = StatisticalAnalysisService(dataset_loader)
 
     def test_should_generate_descriptive_statistics(self, tmp_path):
 

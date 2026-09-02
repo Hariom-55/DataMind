@@ -155,7 +155,7 @@ class TestAnalysisAPI:
         file_path = tmp_path / "test.csv"
         dataset.to_csv(file_path, index=False)
 
-        def failing_analysis(_):
+        def failing_analysis(_dataset_path: str, file_type: str | None = None):
             raise RuntimeError("Analysis service failed")
 
         monkeypatch.setattr(
@@ -170,12 +170,71 @@ class TestAnalysisAPI:
                 "jobId": TEST_JOB_ID,
                 "datasetId": TEST_DATASET_ID,
                 "analysisType": "EDA",
-                "datasetPath": str(file_path)
+                "datasetPath": str(file_path),
+                "fileType": "text/csv"
             }
         )
 
         assert response.status_code == 500
+    
 
         body = response.json()
 
         assert body["detail"] == "Analysis service failed"
+
+    def test_should_run_eda_analysis_on_xlsx(self, tmp_path):
+        dataset = pd.DataFrame({
+            "name": ["Hariom", "Rahul", "Amit"],
+            "age": [22, 23, 24]
+        })
+
+        file_path = tmp_path / "test.xlsx"
+        dataset.to_excel(file_path, index=False)
+
+        response = client.post(
+            "/internal/analyze",
+            json={
+                "jobId": str(TEST_JOB_ID),
+                "datasetId": str(TEST_DATASET_ID),
+                "analysisType": "EDA",
+                "datasetPath": str(file_path),
+                "fileType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            }
+        )
+
+        assert response.status_code == 200
+
+        body = response.json()
+
+        assert body["status"] == "COMPLETED"
+        assert body["result"]["overview"]["rowCount"] == 3
+        assert body["result"]["overview"]["columnCount"] == 2    
+
+
+    def test_should_run_eda_analysis_on_json(self, tmp_path):
+        dataset = pd.DataFrame({
+            "name": ["Hariom", "Rahul", "Amit"],
+            "age": [22, 23, 24]
+        })
+
+        file_path = tmp_path / "test.json"
+        dataset.to_json(file_path, orient="records")
+
+        response = client.post(
+            "/internal/analyze",
+            json={
+                "jobId": str(TEST_JOB_ID),
+                "datasetId": str(TEST_DATASET_ID),
+                "analysisType": "EDA",
+                "datasetPath": str(file_path),
+                "fileType": "application/json"
+            }
+        )
+
+        assert response.status_code == 200
+
+        body = response.json()
+
+        assert body["status"] == "COMPLETED"
+        assert body["result"]["overview"]["rowCount"] == 3
+        assert body["result"]["overview"]["columnCount"] == 2

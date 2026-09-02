@@ -1,10 +1,14 @@
 import pandas as pd 
-
+from app.loaders.dataset_loader import DatasetLoader
 class EDAService :
-    def analyze(self, dataset_path: str)->dict:
+
+    def __init__(self, dataset_loader: DatasetLoader):
+        self.dataset_loader = dataset_loader
+        
+    def analyze(self, dataset_path: str, file_type: str | None = None)->dict:
 
         #1.Load Dataset
-        df = pd.read_csv(dataset_path)
+        df = self.dataset_loader.load(dataset_path, file_type=file_type)
 
         #2. Dataset overview 
         overview = {

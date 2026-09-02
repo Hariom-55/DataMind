@@ -1,12 +1,14 @@
 import pandas as pd
 import pytest
 from app.services.eda_service import EDAService
+from app.loaders.dataset_loader import DatasetLoader
 
 
 class TestEDAService:
 
     def setup_method(self):
-        self.service = EDAService()
+        dataset_loader = DatasetLoader()
+        self.service = EDAService(dataset_loader)
 
     def test_should_return_basic_dataset_overview(self, tmp_path):
 

@@ -1,5 +1,23 @@
 package com.datamind.datamind_api.analysis.integration.e2e;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+import java.io.OutputStream;
+import java.util.UUID;
+
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.datamind.datamind_api.analysis.entity.AnalysisJob;
 import com.datamind.datamind_api.analysis.entity.AnalysisResult;
 import com.datamind.datamind_api.analysis.entity.enums.AnalysisJobStatus;
@@ -9,17 +27,6 @@ import com.datamind.datamind_api.analysis.repository.AnalysisResultRepository;
 import com.datamind.datamind_api.analysis.worker.AnalysisJobWorker;
 import com.datamind.datamind_api.dataset.entity.Dataset;
 import com.datamind.datamind_api.dataset.repository.DatasetRepository;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Map;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(
         properties = {
@@ -430,72 +437,191 @@ class JavaPythonE2ETest
     }
 
     @Test
-void shouldRetryStatisticalAnalysisJobWhenPythonCannotFindDataset()
-{
-    // Arrange
-    Dataset dataset = new Dataset(
-            "missing-statistical-dataset.csv",
-            "e2e-statistical-missing-" + UUID.randomUUID(),
-            100L,
-            "text/csv"
-    );
+    void shouldRetryStatisticalAnalysisJobWhenPythonCannotFindDataset() 
+    {
+        // Arrange
+        Dataset dataset = new Dataset(
+                "missing-statistical-dataset.csv",
+                "e2e-statistical-missing-" + UUID.randomUUID(),
+                100L,
+                "text/csv"
+        );
 
-    dataset.setStoragePath(
-            Path.of(
-                    System.getProperty("java.io.tmpdir"),
-                    "datamind-statistical-missing-" +
-                            UUID.randomUUID() +
-                            ".csv"
-            ).toString()
-    );
+        dataset.setStoragePath(
+                Path.of(
+                        System.getProperty("java.io.tmpdir"),
+                        "datamind-statistical-missing-" +
+                                UUID.randomUUID() +
+                                ".csv"
+                ).toString()
+        );
 
-    dataset = datasetRepository.saveAndFlush(dataset);
+        dataset = datasetRepository.saveAndFlush(dataset);
 
-    AnalysisJob job = new AnalysisJob(
-            dataset,
-            AnalysisType.STATISTICAL,
-            AnalysisJobStatus.PENDING
-    );
+        AnalysisJob job = new AnalysisJob(
+                dataset,
+                AnalysisType.STATISTICAL,
+                AnalysisJobStatus.PENDING
+        );
 
-    job = analysisJobRepository.saveAndFlush(job);
+        job = analysisJobRepository.saveAndFlush(job);
 
-    UUID jobId = job.getId();
+        UUID jobId = job.getId();
 
-    // Act
-    analysisJobWorker.processPendingJob();
+        // Act
+        analysisJobWorker.processPendingJob();
 
-    // Assert
-    AnalysisJob retriedJob =
-            analysisJobRepository
-                    .findById(jobId)
-                    .orElseThrow();
+        // Assert
+        AnalysisJob retriedJob =
+                analysisJobRepository
+                        .findById(jobId)
+                        .orElseThrow();
 
-    assertEquals(
-            AnalysisJobStatus.PENDING,
-            retriedJob.getStatus()
-    );
+        assertEquals(
+                AnalysisJobStatus.PENDING,
+                retriedJob.getStatus()
+        );
 
-    assertEquals(
-            1,
-            retriedJob.getRetryCount()
-    );
+        assertEquals(
+                1,
+                retriedJob.getRetryCount()
+        );
 
-    assertNull(
-            retriedJob.getErrorMessage()
-    );
+        assertNull(
+                retriedJob.getErrorMessage()
+        );
 
-    assertNull(
-            retriedJob.getStartedAt()
-    );
+        assertNull(
+                retriedJob.getStartedAt()
+        );
 
-    assertNull(
-            retriedJob.getCompletedAt()
-    );
+        assertNull(
+                retriedJob.getCompletedAt()
+        );
 
-    assertTrue(
-            analysisResultRepository
-                    .findByJobId(jobId)
-                    .isEmpty()
-    );
-}
+        assertTrue(
+                analysisResultRepository
+                        .findByJobId(jobId)
+                        .isEmpty()
+        );
+    }
+
+    @Test
+    void shouldCompleteEdaAnalysisForExcelDataset() throws Exception
+    {
+        Path datasetPath = Files.createTempFile(
+                "datamind-e2e-",
+                ".xlsx"
+        );
+
+        try
+        {
+            // Create real XLSX dataset
+            try (XSSFWorkbook workbook = new XSSFWorkbook())
+            {
+                Sheet sheet = workbook.createSheet("Customers");
+
+                Row header = sheet.createRow(0);
+                header.createCell(0).setCellValue("name");
+                header.createCell(1).setCellValue("age");
+                header.createCell(2).setCellValue("city");
+
+                Row row1 = sheet.createRow(1);
+                row1.createCell(0).setCellValue("Hariom");
+                row1.createCell(1).setCellValue(21);
+                row1.createCell(2).setCellValue("Delhi");
+
+                Row row2 = sheet.createRow(2);
+                row2.createCell(0).setCellValue("Rahul");
+                row2.createCell(1).setCellValue(22);
+                row2.createCell(2).setCellValue("Mumbai");
+
+                Row row3 = sheet.createRow(3);
+                row3.createCell(0).setCellValue("Aman");
+                row3.createCell(1).setCellValue(20);
+                row3.createCell(2).setCellValue("Delhi");
+
+                try (OutputStream outputStream =
+                             Files.newOutputStream(datasetPath))
+                {
+                    workbook.write(outputStream);
+                }
+            }
+
+            // Create Dataset
+            Dataset dataset = new Dataset(
+                    "e2e-test.xlsx",
+                    "e2e-xlsx-" + UUID.randomUUID(),
+                    Files.size(datasetPath),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            );
+
+            dataset.setStoragePath(
+                    datasetPath.toAbsolutePath().toString()
+            );
+
+            dataset = datasetRepository.saveAndFlush(dataset);
+
+            // Create analysis job
+            AnalysisJob job = new AnalysisJob(
+                    dataset,
+                    AnalysisType.EDA,
+                    AnalysisJobStatus.PENDING
+            );
+
+            job = analysisJobRepository.saveAndFlush(job);
+
+            UUID jobId = job.getId();
+
+            // Act
+            analysisJobWorker.processPendingJob();
+
+            // Assert
+            AnalysisJob completedJob =
+                    analysisJobRepository
+                            .findById(jobId)
+                            .orElseThrow();
+
+            assertEquals(
+                    AnalysisJobStatus.COMPLETED,
+                    completedJob.getStatus()
+            );
+
+            AnalysisResult result =
+                    analysisResultRepository
+                            .findByJobId(jobId)
+                            .orElseThrow();
+
+            assertNotNull(result);
+            assertNotNull(result.getResultData());
+
+            Map<String, Object> resultData =
+                    result.getResultData();
+
+            Map<String, Object> overview =
+                    (Map<String, Object>)
+                            resultData.get("overview");
+
+            assertEquals(
+                    3,
+                    ((Number) overview.get("rowCount")).intValue()
+            );
+
+            assertEquals(
+                    3,
+                    ((Number) overview.get("columnCount")).intValue()
+            );
+
+            assertEquals(
+                    3,
+                    ((java.util.List<?>) resultData.get("columns")).size()
+            );
+        }
+        finally
+        {
+            Files.deleteIfExists(datasetPath);
+        }
+    }
+
+     
 }

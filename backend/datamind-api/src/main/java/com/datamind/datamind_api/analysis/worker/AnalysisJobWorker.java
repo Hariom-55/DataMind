@@ -48,7 +48,8 @@ public class AnalysisJobWorker
                     job.getId(),
                     job.getDataset().getId(),
                     job.getAnalysisType().toString(),
-                    job.getDataset().getStoragePath()
+                    job.getDataset().getStoragePath(),
+                    job.getDataset().getFileType()
             );
 
             if ("COMPLETED".equals(response.getStatus())

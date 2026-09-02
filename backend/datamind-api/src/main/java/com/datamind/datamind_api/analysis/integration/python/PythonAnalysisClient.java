@@ -24,9 +24,10 @@ public class PythonAnalysisClient
             UUID jobId,
             UUID datasetId,
             String analysisType,
-            String datasetPath)
+            String datasetPath,
+            String fileType)
     {
-        PythonAnalysisRequest request = new PythonAnalysisRequest(jobId, datasetId, analysisType,datasetPath);
+        PythonAnalysisRequest request = new PythonAnalysisRequest(jobId, datasetId, analysisType,datasetPath, fileType);
 
         try
         {

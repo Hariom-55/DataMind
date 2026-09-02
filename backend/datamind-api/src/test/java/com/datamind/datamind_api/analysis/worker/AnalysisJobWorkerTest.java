@@ -22,7 +22,7 @@ import java.util.UUID;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class AnalysisJobWorkerTest
+class AnalysisJobWorkerTest
 {
     @Mock
     private AnalysisJobService analysisJobService;
@@ -42,6 +42,7 @@ public class AnalysisJobWorkerTest
     @InjectMocks
     private AnalysisJobWorker analysisJobWorker;
 
+
     @Test
     void shouldDoNothingWhenNoPendingJobExists()
     {
@@ -58,6 +59,7 @@ public class AnalysisJobWorkerTest
                 analysisExecutionService
         );
     }
+
 
     @Test
     void shouldProcessJobSuccessfully()
@@ -88,11 +90,15 @@ public class AnalysisJobWorkerTest
         when(dataset.getStoragePath())
                 .thenReturn("./data/test.csv");
 
+        when(dataset.getFileType())
+                .thenReturn("text/csv");
+
         when(pythonAnalysisClient.analyze(
                 jobId,
                 datasetId,
                 "EDA",
-                "./data/test.csv"
+                "./data/test.csv",
+                "text/csv"
         )).thenReturn(pythonResponse);
 
         when(pythonResponse.getStatus())
@@ -111,7 +117,8 @@ public class AnalysisJobWorkerTest
                         jobId,
                         datasetId,
                         "EDA",
-                        "./data/test.csv"
+                        "./data/test.csv",
+                        "text/csv"
                 );
 
         verify(analysisExecutionService)
@@ -123,6 +130,7 @@ public class AnalysisJobWorkerTest
         verify(analysisJobService, never())
                 .failJob(any(), anyString());
     }
+
 
     @Test
     void shouldFailJobWhenPythonReturnsFailedResponse()
@@ -150,11 +158,15 @@ public class AnalysisJobWorkerTest
         when(dataset.getStoragePath())
                 .thenReturn("./data/test.csv");
 
+        when(dataset.getFileType())
+                .thenReturn("text/csv");
+
         when(pythonAnalysisClient.analyze(
                 jobId,
                 datasetId,
                 "EDA",
-                "./data/test.csv"
+                "./data/test.csv",
+                "text/csv"
         )).thenReturn(pythonResponse);
 
         when(pythonResponse.getStatus())
@@ -178,10 +190,13 @@ public class AnalysisJobWorkerTest
                 );
     }
 
+
     @Test
     void shouldFailJobWhenPythonReturnsIncompleteResult()
     {
         UUID jobId = UUID.randomUUID();
+
+        Dataset dataset = mock(Dataset.class);
 
         when(analysisJobService.claimNextPendingJob())
                 .thenReturn(Optional.of(job));
@@ -190,26 +205,23 @@ public class AnalysisJobWorkerTest
                 .thenReturn(jobId);
 
         when(job.getDataset())
-                .thenReturn(mock(
-                        com.datamind.datamind_api.dataset.entity.Dataset.class
-                ));
+                .thenReturn(dataset);
 
-        when(job.getDataset().getId())
+        when(dataset.getId())
                 .thenReturn(UUID.randomUUID());
 
         when(job.getAnalysisType())
-                .thenReturn(
-                        com.datamind.datamind_api.analysis.entity.enums.AnalysisType.EDA
-                );
+                .thenReturn(AnalysisType.EDA);
 
-        when(job.getDataset().getStoragePath())
+        when(dataset.getStoragePath())
                 .thenReturn("./data/test.csv");
 
         when(pythonAnalysisClient.analyze(
                 any(),
                 any(),
                 anyString(),
-                anyString()
+                anyString(),
+                any()
         )).thenReturn(pythonResponse);
 
         when(pythonResponse.getStatus())
@@ -236,10 +248,13 @@ public class AnalysisJobWorkerTest
                 );
     }
 
+
     @Test
     void shouldFailJobWhenPythonServiceThrowsException()
     {
         UUID jobId = UUID.randomUUID();
+
+        Dataset dataset = mock(Dataset.class);
 
         when(analysisJobService.claimNextPendingJob())
                 .thenReturn(Optional.of(job));
@@ -248,29 +263,28 @@ public class AnalysisJobWorkerTest
                 .thenReturn(jobId);
 
         when(job.getDataset())
-                .thenReturn(mock(
-                        com.datamind.datamind_api.dataset.entity.Dataset.class
-                ));
+                .thenReturn(dataset);
 
-        when(job.getDataset().getId())
+        when(dataset.getId())
                 .thenReturn(UUID.randomUUID());
 
         when(job.getAnalysisType())
-                .thenReturn(
-                        com.datamind.datamind_api.analysis.entity.enums.AnalysisType.EDA
-                );
+                .thenReturn(AnalysisType.EDA);
 
-        when(job.getDataset().getStoragePath())
+        when(dataset.getStoragePath())
                 .thenReturn("./data/test.csv");
 
         PythonAnalysisException exception =
-                new PythonAnalysisException("Python service unavailable");
+                new PythonAnalysisException(
+                        "Python service unavailable"
+                );
 
         when(pythonAnalysisClient.analyze(
                 any(),
                 any(),
                 anyString(),
-                anyString()
+                anyString(),
+                any()
         )).thenThrow(exception);
 
         analysisJobWorker.processPendingJob();
@@ -287,5 +301,4 @@ public class AnalysisJobWorkerTest
                         anyMap()
                 );
     }
-
 }

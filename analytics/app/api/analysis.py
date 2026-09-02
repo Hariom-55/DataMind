@@ -7,11 +7,13 @@ from app.models.analysis_request import AnalysisRequest
 from app.services.eda_service import EDAService
 from app.services.statistical_service import StatisticalAnalysisService
 from app.models.analysis_response import AnalysisResponse
-
+from app.loaders.dataset_loader import DatasetLoader
 
 router = APIRouter()
-eda_service = EDAService()
-statistical_service = StatisticalAnalysisService()
+
+dataset_loader = DatasetLoader()
+eda_service = EDAService(dataset_loader)
+statistical_service = StatisticalAnalysisService(dataset_loader)
 
 
 
@@ -32,13 +34,15 @@ def analyze(request: AnalysisRequest):
         if request.analysisType == "EDA":
 
             result = eda_service.analyze(
-                str(dataset_path)
+                str(dataset_path),
+                file_type=request.fileType
             )
 
         elif request.analysisType == "STATISTICAL":
 
             result = statistical_service.analyze(
-                str(dataset_path)
+                str(dataset_path),
+                file_type=request.fileType
             )
 
         else:

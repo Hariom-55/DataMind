@@ -75,7 +75,8 @@ class PythonAnalysisClientTest
                         jobId,
                         datasetId,
                         "EDA",
-                        "./data/test.csv"
+                        "./data/test.csv",
+                        "text/csv"
                 );
 
         assertNotNull(response);
@@ -113,7 +114,8 @@ class PythonAnalysisClientTest
                         jobId,
                         datasetId,
                         "EDA",
-                        "./data/test.csv"
+                        "./data/test.csv",
+                        "text/csv"
                 );
 
         assertNotNull(response);
@@ -147,7 +149,8 @@ class PythonAnalysisClientTest
                                 jobId,
                                 datasetId,
                                 "EDA",
-                                "./data/test.csv"
+                                "./data/test.csv",
+                                "text/csv"
                         )
                 );
 
