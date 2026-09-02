@@ -6,7 +6,7 @@ from fastapi import APIRouter,HTTPException
 from app.models.analysis_request import AnalysisRequest
 from app.services.eda_service import EDAService
 from app.services.statistical_service import StatisticalAnalysisService
-from app.models.analysis_response import AnalysisResponse
+from app.services.analysis_registry import AnalysisRegistry
 from app.loaders.dataset_loader import DatasetLoader
 
 router = APIRouter()
@@ -14,8 +14,17 @@ router = APIRouter()
 dataset_loader = DatasetLoader()
 eda_service = EDAService(dataset_loader)
 statistical_service = StatisticalAnalysisService(dataset_loader)
+analysis_registry = AnalysisRegistry()
 
+analysis_registry.register(
+    "EDA",
+    eda_service
+)
 
+analysis_registry.register(
+    "STATISTICAL",
+    statistical_service
+)
 
 
 @router.post("/internal/analyze")
@@ -31,26 +40,21 @@ def analyze(request: AnalysisRequest):
 
     try:
 
-        if request.analysisType == "EDA":
+        service = analysis_registry.get_service(
+            request.analysisType.value
+        )
 
-            result = eda_service.analyze(
-                str(dataset_path),
-                file_type=request.fileType
-            )
+        result = service.analyze(
+            str(dataset_path),
+            request.fileType
+        )
 
-        elif request.analysisType == "STATISTICAL":
+    except ValueError as ex:
+        raise HTTPException(
+            status_code=400,
+            detail=str(ex)
+        )
 
-            result = statistical_service.analyze(
-                str(dataset_path),
-                file_type=request.fileType
-            )
-
-        else:
-
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported analysis type: {request.analysisType}"
-            )
 
     except HTTPException:
         raise

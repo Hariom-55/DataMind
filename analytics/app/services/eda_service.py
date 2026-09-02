@@ -1,6 +1,7 @@
 import pandas as pd 
 from app.loaders.dataset_loader import DatasetLoader
-class EDAService :
+from app.services.analysis_service import AnalysisService
+class EDAService(AnalysisService): 
 
     def __init__(self, dataset_loader: DatasetLoader):
         self.dataset_loader = dataset_loader
