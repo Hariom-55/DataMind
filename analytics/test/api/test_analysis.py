@@ -116,7 +116,7 @@ class TestAnalysisAPI:
             json={
                 "jobId": TEST_JOB_ID,
                 "datasetId": TEST_DATASET_ID,
-                "analysisType": "MACHINE_LEARNING",
+                "analysisType": "TIME_SERIES",
                 "datasetPath": str(file_path)
             }
         )
