@@ -667,6 +667,167 @@ class TestMLAnalysisService:
 
         assert "model comparison results" in str(exc_info.value)
 
+    def test_tune_random_forest_classification_model(self):
+        df = pd.DataFrame({
+            "age": [20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+                    30, 31, 32, 33, 34, 35, 36, 37, 38, 39],
+            "salary": [20, 22, 25, 27, 30, 32, 35, 37, 40, 42,
+                    45, 47, 50, 52, 55, 57, 60, 62, 65, 67],
+            "target": [
+                "No", "No", "No", "No", "No",
+                "No", "No", "No", "No", "No",
+                "Yes", "Yes", "Yes", "Yes", "Yes",
+                "Yes", "Yes", "Yes", "Yes", "Yes"
+            ]
+        })
+
+
+        result = self.service._train_model(
+            df=df,
+            target_column="target",
+            problem_type=MLProblemType.CLASSIFICATION
+        )
+
+        assert result["model"] in (
+            "LogisticRegression",
+            "RandomForestClassifier"
+        )
+
+        if result["model"] == "RandomForestClassifier":
+
+            assert result["tuning"] is not None
+
+            assert "bestParameters" in result["tuning"]
+
+            assert "bestScore" in result["tuning"]
+
+            assert isinstance(
+                result["tuning"]["bestParameters"],
+                dict
+            )
+
+            assert isinstance(
+                result["tuning"]["bestScore"],
+                float
+            )
+
+    def test_tune_random_forest_regression_model(self):
+        df = pd.DataFrame({
+            "feature_1": [
+                1, 2, 3, 4, 5,
+                6, 7, 8, 9, 10,
+                11, 12, 13, 14, 15,
+                16, 17, 18, 19, 20
+            ],
+            "feature_2": [
+                10, 12, 14, 16, 18,
+                20, 22, 24, 26, 28,
+                30, 32, 34, 36, 38,
+                40, 42, 44, 46, 48
+            ],
+            "target": [
+                15, 18, 21, 24, 27,
+                30, 33, 36, 39, 42,
+                45, 48, 51, 54, 57,
+                60, 63, 66, 69, 72
+            ]
+        })
+
+
+
+        result = self.service._train_model(
+            df=df,
+            target_column="target",
+            problem_type=MLProblemType.REGRESSION
+        )
+
+        assert result["model"] in (
+            "LinearRegression",
+            "RandomForestRegressor"
+        )
+
+        if result["model"] == "RandomForestRegressor":
+
+            assert result["tuning"] is not None
+
+            assert "bestParameters" in result["tuning"]
+
+            assert "bestScore" in result["tuning"]
+
+            assert isinstance(
+                result["tuning"]["bestParameters"],
+                dict
+            )
+
+            assert isinstance(
+                result["tuning"]["bestScore"],
+                float
+            )
+
+            assert result["tuning"]["bestScore"] >= 0
+
+    def test_non_random_forest_model_has_no_tuning_result(self):
+        df = pd.DataFrame({
+            "feature_1": [1, 2, 3, 4, 5, 6, 7, 8],
+            "feature_2": [2, 4, 6, 8, 10, 12, 14, 16],
+            "target": [10, 20, 30, 40, 50, 60, 70, 80]
+        })
+
+        result = self.service._train_model(
+            df=df,
+            target_column="target",
+            problem_type=MLProblemType.REGRESSION
+        )
+
+        if result["model"] == "LinearRegression":
+            assert result["tuning"] is None
+
+
+    def test_random_forest_tuning_returns_expected_parameters(self):
+        X_train = pd.DataFrame({
+            "feature_1": [
+                1, 2, 3, 4, 5,
+                6, 7, 8, 9, 10,
+                11, 12
+            ],
+            "feature_2": [
+                2, 4, 6, 8, 10,
+                12, 14, 16, 18, 20,
+                22, 24
+            ]
+        })
+
+        y_train = pd.Series([
+            0, 0, 0,
+            1, 1, 1,
+            0, 0, 1,
+            1, 0, 1
+        ])
+
+    
+
+        preprocessor = self.service._build_preprocessor(
+            X_train
+        )
+
+        result = self.service._tune_random_forest(
+            X_train=X_train,
+            y_train=y_train,
+            preprocessor=preprocessor,
+            problem_type=MLProblemType.CLASSIFICATION
+        )
+
+        parameters = result["bestParameters"]
+
+        assert "model__n_estimators" in parameters
+
+        assert "model__max_depth" in parameters
+
+        assert "model__min_samples_split" in parameters
+
+
+    
+
         
 
               

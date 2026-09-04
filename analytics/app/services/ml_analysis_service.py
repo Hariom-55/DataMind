@@ -20,8 +20,10 @@ from sklearn.model_selection import (
     train_test_split,
     StratifiedKFold,
     KFold,
+    GridSearchCV,
     cross_val_score
 )
+
 
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.pipeline import Pipeline
@@ -426,6 +428,142 @@ class MLAnalysisService(AnalysisService):
             key=lambda model:comparison_results[model]["meanScore"]
         )
 
+    def _build_cv(self, y, problem_type):
+
+        if problem_type == MLProblemType.CLASSIFICATION:
+            class_counts = y.value_counts()
+
+            if class_counts.empty:
+                return None
+
+            min_class_count = class_counts.min()
+
+            if min_class_count < 2:
+                return None
+
+            n_splits = min(5, int(min_class_count))
+
+            return StratifiedKFold(
+                n_splits=n_splits,
+                shuffle=True,
+                random_state=42
+            )
+
+        if problem_type == MLProblemType.REGRESSION:
+
+            if len(y) < 2 :
+                return None
+
+            n_splits = min(5, len(y))
+
+            return KFold(
+                n_splits=n_splits,
+                shuffle=True,
+                random_state=42
+            )
+
+        raise ValueError(
+            f"Unsupported problem Type: {problem_type}"
+        )
+
+    
+    def _tune_random_forest(
+            self,
+            X_train,
+            y_train,
+            preprocessor,
+            problem_type
+    ):
+
+        if problem_type == MLProblemType.CLASSIFICATION:
+
+            pipeline = Pipeline(
+                steps = [
+                    ("preprocessor", preprocessor),
+                    ("model", RandomForestClassifier(
+                        random_state=42
+                    ))
+                ]
+            )
+
+            param_grid = {
+                "model__n_estimators": [50, 100],
+                "model__max_depth": [None, 10],
+                "model__min_samples_split": [2, 5]
+            }
+
+            cv = self._build_cv(
+                y_train,
+                problem_type
+            )
+
+            if cv is None:
+                raise ValueError(
+                    "Not enough data for hyperparameter tunning"
+                )
+
+            grid_serach = GridSearchCV(
+                estimator=pipeline,
+                param_grid=param_grid,
+                scoring="accuracy",
+                cv=cv,
+                n_jobs=1
+            )
+
+            grid_serach.fit(X_train, y_train)
+
+            return {
+                "model": "RandomForestClassifier",
+                "bestParameters": grid_serach.best_params_,
+                "bestScore":float(grid_serach.best_score_),
+                "bestEstimator": grid_serach.best_estimator_
+            }
+
+        if problem_type == MLProblemType.REGRESSION:
+
+            pipeline = Pipeline(
+                steps=[
+                    ("preprocessor", preprocessor),
+                    ("model", RandomForestRegressor(
+                        random_state=42
+                    ))
+                ]
+            )
+
+            param_grid = {
+                "model__n_estimators": [50, 100],
+                "model__max_depth": [None, 10],
+                "model__min_samples_split": [2, 5]
+            }
+
+            cv = self._build_cv(y_train, problem_type)
+
+            if cv is None:
+                raise ValueError(
+                    "Not enough data for hyperparamter tuning"
+                )
+
+            grid_search = GridSearchCV(
+                estimator=pipeline,
+                param_grid=param_grid,
+                scoring="neg_mean_absolute_error",
+                cv=cv,
+                n_jobs=1
+            )
+
+            grid_search.fit(X_train, y_train)
+
+            return {
+                "model": "RandomForestRegressor",
+                "bestParameter": grid_search.best_params_,
+                "bestScore": float (-grid_search.best_score_),
+                "bestEstimator": grid_search.best_estimator_
+            }
+
+        raise ValueError(
+            "Unsupported problem type for Random Forest Tuning"
+        )
+
     def _train_model(
             self,
             df: pd.DataFrame,
@@ -504,28 +642,57 @@ class MLAnalysisService(AnalysisService):
 
         best_model = candidate_models[best_model_name]
 
-        #Building final pipeline using selected model
-        pipeline = Pipeline([
-            (
-                "preprocessor",
-                preprocessor
-            ),
-            (
-                "model",
-                best_model
+
+        #hyperparameter tuning 
+        tuning_result = None
+
+        if best_model_name in (
+            "RandomForestClassifier",
+            "RandomForestRegressor"
+        ):
+            tuning_result = self._tune_random_forest(
+                X_train,
+                y_train,
+                preprocessor,
+                problem_type
             )
-        ])
+
+            pipeline = tuning_result["bestEstimator"]
+
+        #Building final pipeline using selected model    
+
+        else:
+            pipeline = Pipeline([
+                (
+                    "preprocessor",
+                    preprocessor
+                ),
+                (
+                    "model",
+                    best_model
+                )
+            ])
 
         #training selected model
-
-
         pipeline.fit(X_train, y_train)
 
         #Evaluating the model
         predictions = pipeline.predict(X_test)
 
         #calculating Feature Importance
-        feature_importance = self._get_feature_importance(pipeline)
+        feature_importance = self._get_feature_importance(pipeline) 
+
+        #serialization
+
+        tuning_response = None
+
+        if tuning_result is not None:
+            tuning_response = {
+                "bestParameters": tuning_result["bestParameters"],
+                "bestScore": round(
+                    float(tuning_result["bestScore"]), 4
+                )
+            }
 
         #Classification results 
 
@@ -534,6 +701,7 @@ class MLAnalysisService(AnalysisService):
             return {
                 "model": best_model_name,
                 "modelComparison": comparison_results,
+                "tuning": tuning_response,
 
                 "metrics": {
                     "accuracy": round(
@@ -558,6 +726,8 @@ class MLAnalysisService(AnalysisService):
         return {
             "model":best_model_name,
             "modelComparison": comparison_results,
+            "tuning": tuning_response,
+            
             "metrics": {
                 "mean_squared_error": round(
                     float(mse), 4
