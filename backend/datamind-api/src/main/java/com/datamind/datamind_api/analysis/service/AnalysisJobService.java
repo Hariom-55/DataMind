@@ -30,7 +30,8 @@ public class AnalysisJobService
 
     public AnalysisJob createAnalysisJob(
             java.util.UUID datasetId,
-            AnalysisType analysisType
+            AnalysisType analysisType,
+            String targetColumn
     ){
         Dataset dataset = datasetService.getDatasetById(datasetId);
 
@@ -39,6 +40,8 @@ public class AnalysisJobService
                 analysisType,
                 AnalysisJobStatus.PENDING
         );
+
+        analysisJob.setTargetColumn(targetColumn);
 
         return analysisJobRepository.save(analysisJob);
     }

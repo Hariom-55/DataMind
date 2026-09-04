@@ -51,7 +51,8 @@ public class AnalysisJobControllerTest
 
         when(analysisJobService.createAnalysisJob(
                 datasetId,
-                AnalysisType.EDA
+                AnalysisType.EDA,
+                null
         )).thenReturn(analysisJob);
 
         mockMvc.perform(
@@ -69,7 +70,8 @@ public class AnalysisJobControllerTest
 
         verify(analysisJobService).createAnalysisJob(
                 datasetId,
-                AnalysisType.EDA
+                AnalysisType.EDA,
+                null
         );
     }
 

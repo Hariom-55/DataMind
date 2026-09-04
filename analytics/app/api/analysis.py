@@ -54,7 +54,8 @@ def analyze(request: AnalysisRequest):
 
         result = service.analyze(
             str(dataset_path),
-            request.fileType
+            request.fileType,
+            request.targetColumn
         )
 
     except ValueError as ex:

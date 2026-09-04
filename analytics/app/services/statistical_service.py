@@ -6,7 +6,7 @@ class StatisticalAnalysisService(AnalysisService):
     def __init__(self, dataset_loader: DatasetLoader):
         self.dataset_loader = dataset_loader
         
-    def analyze(self, dataset_path: str, file_type: str | None = None) -> dict :
+    def analyze(self, dataset_path: str, file_type: str | None = None, target_column: str | None = None) -> dict :
         #1.Load Dataset
         df = self.dataset_loader.load(dataset_path, file_type=file_type)
 

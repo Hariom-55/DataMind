@@ -27,7 +27,20 @@ public class PythonAnalysisClient
             String datasetPath,
             String fileType)
     {
-        PythonAnalysisRequest request = new PythonAnalysisRequest(jobId, datasetId, analysisType,datasetPath, fileType);
+        return analyze(jobId, datasetId, analysisType, datasetPath, fileType, null);
+    }
+
+    public PythonAnalysisResponse analyze(
+            UUID jobId,
+            UUID datasetId,
+            String analysisType,
+            String datasetPath,
+            String fileType,
+            String targetColumn)
+    {
+        PythonAnalysisRequest request = new PythonAnalysisRequest(
+                jobId, datasetId, analysisType, datasetPath, fileType, targetColumn
+        );
 
         try
         {

@@ -1,12 +1,21 @@
 package com.datamind.datamind_api.analysis.entity;
 
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import com.datamind.datamind_api.analysis.entity.enums.AnalysisJobStatus;
 import com.datamind.datamind_api.analysis.entity.enums.AnalysisType;
 import com.datamind.datamind_api.dataset.entity.Dataset;
-import jakarta.persistence.*;
 
-import java.util.UUID;
-import java.time.LocalDateTime;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "analysis_jobs")
@@ -38,9 +47,13 @@ public class AnalysisJob
     private LocalDateTime startedAt;
 
     private LocalDateTime completedAt;
+    
 
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
+    
+    @Column(name = "target_column")
+    private String targetColumn;
 
     public AnalysisJob () {}
 
@@ -92,6 +105,11 @@ public class AnalysisJob
        return errorMessage;
    }
 
+   public String getTargetColumn()
+   {
+       return targetColumn;
+   }
+
     public void setStartedAt(LocalDateTime startedAt) {
         this.startedAt = startedAt;
     }
@@ -124,7 +142,7 @@ public class AnalysisJob
         this.status = AnalysisJobStatus.FAILED;
         this.startedAt = null;
         this.completedAt = LocalDateTime.now();
-        this.errorMessage =errorMessage;
+        this.errorMessage = errorMessage;
     }
 
     public void incrementRetryCount()
@@ -143,5 +161,10 @@ public class AnalysisJob
     public void setCreatedAt(LocalDateTime createdAt)
     {
         this.createdAt = createdAt;
+    }
+
+    public void setTargetColumn(String targetColumn)
+    {
+        this.targetColumn = targetColumn;
     }
 }

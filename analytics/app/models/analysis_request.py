@@ -11,3 +11,4 @@ class AnalysisRequest(BaseModel):
     analysisType: AnalysisType
     datasetPath: str 
     fileType: str | None = None
+    targetColumn: str | None= None

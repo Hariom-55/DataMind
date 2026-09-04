@@ -155,7 +155,7 @@ class TestAnalysisAPI:
         file_path = tmp_path / "test.csv"
         dataset.to_csv(file_path, index=False)
 
-        def failing_analysis(_dataset_path: str, file_type: str | None = None):
+        def failing_analysis(dataset_path: str, file_type: str | None = None, taregt_column = None):
             raise RuntimeError("Analysis service failed")
 
         monkeypatch.setattr(

@@ -6,6 +6,7 @@ class AnalysisService(ABC):
     def analyze(
         self,
         dataset_path: str,
-        file_type: str | None = None
+        file_type: str | None = None,
+        target_column: str | None = None
     ) -> dict:
         pass

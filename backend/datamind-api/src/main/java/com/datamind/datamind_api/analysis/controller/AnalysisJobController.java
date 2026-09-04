@@ -28,7 +28,8 @@ public class AnalysisJobController
             ){
         AnalysisJob analysisJob = analysisJobService.createAnalysisJob(
                 request.getDatasetId(),
-                request.getAnalysisType()
+                request.getAnalysisType(),
+                request.getTargetColumn()
         );
 
         return ResponseEntity

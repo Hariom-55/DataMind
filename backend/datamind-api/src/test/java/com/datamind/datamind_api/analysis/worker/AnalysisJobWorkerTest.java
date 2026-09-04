@@ -98,7 +98,8 @@ class AnalysisJobWorkerTest
                 datasetId,
                 "EDA",
                 "./data/test.csv",
-                "text/csv"
+                "text/csv",
+                null
         )).thenReturn(pythonResponse);
 
         when(pythonResponse.getStatus())
@@ -118,7 +119,8 @@ class AnalysisJobWorkerTest
                         datasetId,
                         "EDA",
                         "./data/test.csv",
-                        "text/csv"
+                        "text/csv",
+                        null
                 );
 
         verify(analysisExecutionService)
@@ -166,7 +168,8 @@ class AnalysisJobWorkerTest
                 datasetId,
                 "EDA",
                 "./data/test.csv",
-                "text/csv"
+                "text/csv",
+                null
         )).thenReturn(pythonResponse);
 
         when(pythonResponse.getStatus())
@@ -221,6 +224,7 @@ class AnalysisJobWorkerTest
                 any(),
                 anyString(),
                 anyString(),
+                any(),
                 any()
         )).thenReturn(pythonResponse);
 
@@ -284,6 +288,7 @@ class AnalysisJobWorkerTest
                 any(),
                 anyString(),
                 anyString(),
+                any(),
                 any()
         )).thenThrow(exception);
 

@@ -10,16 +10,18 @@ public class PythonAnalysisRequest
     private String analysisType;
     private String datasetPath;
     private String fileType;
+    private String targetColumn;
 
     public PythonAnalysisRequest() {}
 
-    public PythonAnalysisRequest(UUID jobId, UUID datasetId, String analysisType, String datasetPath, String fileType)
+    public PythonAnalysisRequest(UUID jobId, UUID datasetId, String analysisType, String datasetPath, String fileType, String targetColumn)
     {
         this.jobId = jobId;
         this.datasetId = datasetId;
         this.analysisType = analysisType;
         this.datasetPath = datasetPath;
         this.fileType = fileType;
+        this.targetColumn = targetColumn;
     }
 
     public UUID getJobId() {
@@ -41,5 +43,10 @@ public class PythonAnalysisRequest
 
     public String getFileType(){
         return fileType;
+    }
+
+    public String getTargetColumn()
+    {
+        return targetColumn;
     }
 }

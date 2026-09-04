@@ -49,7 +49,8 @@ public class AnalysisJobServiceTest {
 
         AnalysisJob result = analysisJobService.createAnalysisJob(
                 datasetId,
-                AnalysisType.EDA
+                AnalysisType.EDA,
+                null
         );
 
         assertNotNull(result);
