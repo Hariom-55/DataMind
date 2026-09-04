@@ -2,7 +2,7 @@ import pytest
 import pandas as pd
 from app.services.ml_analysis_service import MLAnalysisService
 from app.loaders.dataset_loader import DatasetLoader
-
+from app.models.ml_problem_type import MLProblemType
 
 class TestMLAnalysisService:
 
@@ -213,10 +213,16 @@ class TestMLAnalysisService:
 
         training = result["training"]
 
-        assert training["model"] == "LogisticRegression"
+        comparison = training["modelComparison"]
+
+        expected_model = max(
+            comparison,
+            key=lambda model:comparison[model]["meanScore"]
+        )
+
+        assert training["model"] == expected_model
 
         metrics = training["metrics"]
-        cross_validation = training["crossValidation"]
         feature_importance = training["featureImportance"]
 
         #feature importance
@@ -261,12 +267,7 @@ class TestMLAnalysisService:
         assert 0<= metrics["recall"] <= 1
         assert 0<= metrics["f1_score"] <= 1
 
-        #cross validation
-        assert "meanScore" in cross_validation
-        assert "standardDeviation" in cross_validation
-
-        assert 0<= cross_validation["meanScore"] <=1
-        assert cross_validation["standardDeviation"] >= 0
+        
        
 
     def test_should_train_regression_model(self, tmp_path):
@@ -297,10 +298,16 @@ class TestMLAnalysisService:
 
         training = result["training"]
 
-        assert training["model"] == "LinearRegression"
+        comparison = training["modelComparison"]
+
+        expected_model = min(
+            comparison,
+            key=lambda model: comparison[model]["meanScore"]
+        )
+
+        assert training["model"] == expected_model
 
         metrics = training["metrics"]
-        cross_validation = training["crossValidation"]
         feature_importance = training["featureImportance"]
 
         #Feature importance
@@ -335,21 +342,14 @@ class TestMLAnalysisService:
         assert "mean_absolute_error" in metrics
         assert "root_mean_squared_error" in metrics
         assert "r2Score" in metrics
-        assert "meanScore" in cross_validation
-        assert "standardDeviation" in cross_validation
-        
+    
 
         assert metrics["mean_squared_error"] >= 0
         assert metrics["mean_absolute_error"] >= 0
         assert metrics["root_mean_squared_error"] >= 0
         assert isinstance(metrics["r2Score"], float)
 
-        assert isinstance(
-            cross_validation["meanScore"],
-            float
-        )
-
-        assert cross_validation["standardDeviation"] >= 0
+        
 
     def test_should_detected_balanced_class_distribution(self):
 
@@ -390,6 +390,282 @@ class TestMLAnalysisService:
 
         assert result["imbalanceDetected"] is False
 
+    def test_random_forest_feature_importance(
+            self
+    ):
+        from sklearn.compose import ColumnTransformer
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.impute import SimpleImputer
+        from sklearn.pipeline import Pipeline
+        from sklearn.preprocessing import OneHotEncoder 
+        from app.services.ml_analysis_service import MLAnalysisService
+
+        X = pd.DataFrame({
+            "age": [20, 25, 30, 35, 40, 45, 50, 55],
+            "income": [20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000],
+            "city": [
+                "Delhi",
+                "Mumbai",
+                "Delhi",
+                "Mumbai",
+                "Delhi",
+                "Mumbai",
+                "Delhi",
+                "Mumbai"
+            ]
+        })
+
+        y = pd.Series([
+            "No",
+            "No",
+            "No",
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+            "yes",
+        ])
+
+        numeric_features = ["age", "income"]
+        categorical_features = ["city"]
+
+        numeric_pipeline = Pipeline([
+            (
+                "imputer",
+                SimpleImputer(strategy="median")
+            )
+        ])
+
+        categorical_pipeline = Pipeline([
+            (
+                "imputer",
+                SimpleImputer(strategy="most_frequent")
+            ),
+            (
+                "encoder",
+                OneHotEncoder(handle_unknown="ignore")
+            )
+        ])
+
+        preprocessor = ColumnTransformer(
+            transformers=[
+                (
+                    "numeric",
+                    numeric_pipeline,
+                    numeric_features
+                ),
+                (
+                    "categorical",
+                    categorical_pipeline,
+                    categorical_features
+                )
+            ]
+        )
+
+        model = RandomForestClassifier(
+            n_estimators=100,
+            random_state=42
+        )
+
+        pipeline = Pipeline([
+            (
+                "preprocessor",
+                preprocessor
+            ),
+            (
+                "model",
+                model
+            )
+        ])
+
+        pipeline.fit(X, y)
+
+
+        feature_importance = self.service._get_feature_importance(pipeline)
+
+        assert feature_importance
+
+        assert all(
+            "feature" in item
+            for item in feature_importance
+        )
+
+        assert all(
+            "importance" in item
+            for item in feature_importance
+        )
+
+        feature_names = {
+            item["feature"]
+            for item in feature_importance
+        }
+
+        assert "age" in feature_names
+        assert "income" in feature_names
+        assert "city" in feature_names
+
+        assert all(
+            not item["feature"].startswith("numeric__")
+            for item in feature_importance
+        )
+
+        assert all(
+            not item["feature"].startswith("categorical__")
+            for item in feature_importance
+        )
+
+
+        assert all(
+            item["importance"] >= 0
+            for item in feature_importance
+        )
+
+    def test_compare_classification_models(self):
+
+        X = pd.DataFrame({
+            "age": [20, 21, 25, 30, 35, 40, 45, 50, 55, 60],
+            "income": [
+                20000, 22000, 25000, 30000, 35000,
+                40000, 45000, 50000, 55000, 60000
+            ]
+        })
+
+        y = pd.Series([
+            "No", "No","No", "No","No",
+            "Yes", "Yes","Yes", "Yes","Yes"
+        ])
+
+
+        preprocessor = self.service._build_preprocessor(X)
+
+
+        results = self.service._compare_models(
+            X,
+            y,
+            preprocessor,
+            MLProblemType.CLASSIFICATION
+        )
+
+        assert results
+
+        assert "LogisticRegression" in results
+        assert "RandomForestClassifier" in results
+
+        for model_name, result in results.items():
+            assert "meanScore" in result
+            assert "standardDeviation" in result
+
+            assert 0 <= result["meanScore"] <= 1
+            assert result["standardDeviation"] >= 0
+
+
+    def test_compare_regression_models(self):
+
+        X = pd.DataFrame({
+            "age":[20, 22, 25, 28, 30, 35, 40, 45, 50, 55],
+            "experience": [1, 2, 3, 5, 6, 8, 10, 12, 15, 18],
+            "income": [
+                20000,
+                22000,
+                26000, 
+                30000, 
+                33000, 
+                38000, 
+                45000, 
+                50000,
+                58000,
+                65000
+            ]
+        })
+
+        y = pd.Series([
+            25000,
+            27000,
+            30000,
+            34000,
+            37000,
+            43000,
+            50000,
+            56000,
+            65000,
+            72000
+        ])
+
+        preprocessor = self.service._build_preprocessor(X)
+        
+        
+        results = self.service._compare_models(
+            X,
+            y,
+            preprocessor,
+            MLProblemType.REGRESSION
+        )
+
+        assert results
+
+        assert "LinearRegression" in results
+        assert "RandomForestRegressor" in results
+
+        for model_name, results in results.items():
+            assert "meanScore" in results
+            assert "standardDeviation" in results
+
+            assert results["meanScore"] >= 0
+            assert results["standardDeviation"] >= 0
+
+
+    def test_select_best_classification_model(self):
+
+        comparison_results = {
+            "LogisticRegression": {
+                "meanScore": 0.82,
+                "standardDeviation": 0.05
+            },
+
+            "RandomForestClassifier":{
+                "meanScore": 0.91,
+                "standardDeviation": 0.03
+            }
+        }
+
+        best_model = self.service._select_best_model(
+            comparison_results,
+            MLProblemType.CLASSIFICATION
+        )
+
+        assert best_model == "RandomForestClassifier"
+
+    def test_select_best_regression_model(self):
+
+        comparison_results = {
+            "LinearRegression" :
+            {
+                "meanScore": 4500.0,
+                "standardDeviation": 500.0
+            },
+            "RandomForestRegressor":
+            {
+                "meanScore": 3200.0,
+                "standardDeviation": 300.0
+            }
+        }
+
+        best_model = self.service._select_best_model(
+            comparison_results,
+            MLProblemType.REGRESSION
+        )
+
+        assert best_model == "RandomForestRegressor"
+
+    def test_select_best_model_raises_error_for_empty_results(self):
+
+        with pytest.raises(ValueError) as exc_info:
+            self.service._select_best_model(
+                {},
+                MLProblemType.CLASSIFICATION
+            )
+
+        assert "model comparison results" in str(exc_info.value)
 
         
 

@@ -22,6 +22,8 @@ from sklearn.model_selection import (
     KFold,
     cross_val_score
 )
+
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
@@ -148,13 +150,20 @@ class MLAnalysisService(AnalysisService):
 
         original_feature_names = self._get_original_feature_names(pipeline)
 
-        coefficients = model.coef_
+        if hasattr(model, "coef_"):
+            coefficients = model.coef_
 
-        if coefficients.ndim == 1:
-            importance_values = abs(coefficients)
+            if coefficients.ndim == 1:
+                importance_values = abs(coefficients)
 
-        else:
-            importance_values = abs(coefficients).mean(axis=0)
+            else:
+                importance_values = abs(coefficients).mean(axis=0)
+
+        elif hasattr(model, "feature_importances_"):
+            importance_values = model.feature_importances_
+
+        else :
+            return []
 
         transformed_importance = [
             {
@@ -293,43 +302,39 @@ class MLAnalysisService(AnalysisService):
 
         return feature_names
 
-    def _train_model(
+    def  _build_preprocessor(
             self,
-            df: pd.DataFrame,
-            target_column: str,
-            problem_type: MLProblemType
-    )->dict :
+            X:pd.DataFrame
+    )-> ColumnTransformer:
 
-        data = df.dropna(subset=[target_column])
+        numeric_features = X.select_dtypes(
+            include =["number"]
+        ).columns.tolist()
 
-        X = data.drop(columns=[target_column])
-        y = data[target_column]
-
-
-        if X.empty:
-            raise ValueError(
-                "Dataset must have at least one feature column"
-            )
-
-        if len(data) < 4:
-            raise ValueError(
-                "Dataset must have at least 4 rows for training"
-            )
-
-        numeric_features = X.select_dtypes(include=['number']).columns.tolist()
-        categorical_features = X.select_dtypes(exclude=['number']).columns.tolist()
+        categorical_features = X.select_dtypes(
+            exclude=["number"]
+        ).columns.tolist()
 
         numeric_pipeline = Pipeline([
-            ('imputer', SimpleImputer(strategy='median'))
+            (
+                "imputer",
+                SimpleImputer(strategy="median")
+            )
         ])
 
         categorical_pipeline = Pipeline([
-            ('imputer', SimpleImputer(strategy='most_frequent')),
-            ('encoder', OneHotEncoder(handle_unknown='ignore'))
+            (
+                "imputer",
+                SimpleImputer(strategy="most_frequent")
+            ),
+            (
+                "encoder",
+                OneHotEncoder(handle_unknown="ignore")
+            )
         ])
 
-        preprocessor = ColumnTransformer(
-            transformers = [
+        return ColumnTransformer(
+            transformers=[
                 (
                     "numeric",
                     numeric_pipeline,
@@ -340,28 +345,122 @@ class MLAnalysisService(AnalysisService):
                     categorical_pipeline,
                     categorical_features
                 )
-                
             ]
         )
 
-        if problem_type == MLProblemType.CLASSIFICATION:
+    def _get_candidate_models(
+            self,
+            problem_type: MLProblemType
+    ) -> dict:
 
-            if y.nunique() < 2:
+        if problem_type == MLProblemType.CLASSIFICATION:
+            return{
+                "LogisticRegression": LogisticRegression(
+                    max_iter=1000
+                ),
+                "RandomForestClassifier": RandomForestClassifier(
+                    n_estimators=100,
+                    random_state=42
+                )
+            }
+
+        return {
+            "LinearRegression": LinearRegression(),
+            "RandomForestRegressor": RandomForestRegressor(
+                n_estimators=100,
+                random_state=42
+            )
+        }
+
+    def _compare_models(
+            self,
+            X: pd.DataFrame,
+            y: pd.Series,
+            preprocessor: ColumnTransformer,
+            problem_type: MLProblemType
+    ) -> dict :
+
+        candidate_models = self._get_candidate_models(problem_type)
+
+        results = {}
+
+        for model_name, model in candidate_models.items():
+
+            pipeline = Pipeline([
+                (
+                    "preprocessor",
+                    preprocessor
+                ),
+                (
+                    "model",
+                    model
+                )
+            ])
+
+            cross_validation_results = self._cross_validate_model(pipeline, X , y, problem_type)
+
+            if cross_validation_results is not None:
+                results[model_name] = cross_validation_results
+
+        return results
+
+    def _select_best_model (
+            self,
+            comparison_results: dict,
+            problem_type: MLProblemType
+    )-> str :
+
+        if not comparison_results:
+            raise ValueError(
+                "No model comparison results availabe"
+            )
+
+        if problem_type == MLProblemType.CLASSIFICATION:
+            return max(
+                comparison_results,
+                key=lambda model:comparison_results[model]["meanScore"]
+            )
+
+        return min(
+            comparison_results,
+            key=lambda model:comparison_results[model]["meanScore"]
+        )
+
+    def _train_model(
+            self,
+            df: pd.DataFrame,
+            target_column: str,
+            problem_type: MLProblemType
+    )->dict :
+
+        #prepare data
+
+        data = df.dropna(subset=[target_column])
+
+        X = data.drop(columns=[target_column])
+        y = data[target_column]
+
+        #validate dataset
+        if X.empty:
+            raise ValueError(
+                "Dataset must have at least one feature column"
+            )
+
+        if len(data) < 4:
+            raise ValueError(
+                "Dataset must have at least 4 rows for training"
+            )
+
+        if problem_type ==MLProblemType.CLASSIFICATION:
+
+            if y.nunique() < 2 :
                 raise ValueError(
-                    "Classification target must contain atleast two classes"
+                    "classification target must cpnatin atleast two classes"
                 )
 
-            model = LogisticRegression(max_iter=1000)
-
-        else:
-            model = LinearRegression()
-
-        pipeline = Pipeline([
-            ('preprocessor', preprocessor),
-            ('model', model)
-        ])
-
+        #split dataset
         test_size = max(0.2, 2 / len(X))
+
 
         if problem_type == MLProblemType.CLASSIFICATION:
             X_train, X_test, y_train, y_test = train_test_split(
@@ -380,55 +479,100 @@ class MLAnalysisService(AnalysisService):
                 random_state=42
             )
 
-        pipeline.fit(X_train, y_train)
+        #preprocessing pipeline
+        preprocessor = self._build_preprocessor(X_train)
 
-        predictions = pipeline.predict(X_test)
-
-        cross_validation_results = self._cross_validate_model(
-            pipeline,
+        #compare candidate models using training data
+        comparison_results = self._compare_models(
             X_train,
             y_train,
+            preprocessor,
             problem_type
         )
 
+        if not comparison_results:
+            raise ValueError(
+                "Unable to compare models with available dataset"
+            )
+
+        #selecting best model 
+
+        best_model_name = self._select_best_model(comparison_results, problem_type)
+
+        #getting candidate model
+        candidate_models = self._get_candidate_models(problem_type)
+
+        best_model = candidate_models[best_model_name]
+
+        #Building final pipeline using selected model
+        pipeline = Pipeline([
+            (
+                "preprocessor",
+                preprocessor
+            ),
+            (
+                "model",
+                best_model
+            )
+        ])
+
+        #training selected model
+
+
+        pipeline.fit(X_train, y_train)
+
+        #Evaluating the model
+        predictions = pipeline.predict(X_test)
+
+        #calculating Feature Importance
         feature_importance = self._get_feature_importance(pipeline)
+
+        #Classification results 
 
         if problem_type == MLProblemType.CLASSIFICATION:
 
             return {
-                "model":"LogisticRegression",
+                "model": best_model_name,
+                "modelComparison": comparison_results,
+
                 "metrics": {
-                    "accuracy": round(float(
-                        accuracy_score(y_test, predictions)
-                    ), 4),
-                    "precision": round(float(
-                        precision_score(y_test, predictions, average='weighted', zero_division=0)
-                    ), 4),
-                    "recall": round(float(
-                        recall_score(y_test, predictions, average='weighted', zero_division=0)
-                    ), 4),
-                    "f1_score": round(float(
-                        f1_score(y_test, predictions, average='weighted', zero_division=0)
-                    ), 4)
+                    "accuracy": round(
+                        float(accuracy_score(y_test, predictions)) , 4
+                    ),
+                    "precision": round(
+                        float(precision_score(y_test, predictions, average= "weighted", zero_division=0)), 4
+                    ),
+                    "recall": round(
+                        float(recall_score(y_test, predictions, average="weighted", zero_division=0)), 4
+                    ),
+                    "f1_score": round(
+                        float(f1_score(y_test, predictions, average="weighted", zero_division=0)), 4
+                    )
+                    
                 },
-                "crossValidation": cross_validation_results,
                 "featureImportance": feature_importance
             }
+
         mse = mean_squared_error(y_test, predictions)
 
         return {
-            "model":"LinearRegression",
+            "model":best_model_name,
+            "modelComparison": comparison_results,
             "metrics": {
-                "mean_squared_error": round(float(mse), 4),
-                "mean_absolute_error": round(float(
-                    mean_absolute_error(y_test, predictions)
-                ), 4),
-                "root_mean_squared_error": round(float(mse ** 0.5), 4),
-                "r2Score": round(float(
-                    r2_score(y_test, predictions)
-                ),4)
+                "mean_squared_error": round(
+                    float(mse), 4
+                ),
+                "mean_absolute_error": round(
+                    float(
+                    mean_absolute_error(y_test, predictions)), 4
+                ),
+                "root_mean_squared_error": round(
+                    float(mse ** 0.5), 4
+                ),
+                "r2Score": round(
+                    float(r2_score(y_test, predictions)),4
+                )
             },
-            "crossValidation": cross_validation_results,
             "featureImportance": feature_importance
         }
 
@@ -496,4 +640,3 @@ class MLAnalysisService(AnalysisService):
             "training": training_results,
         }
 
-    

@@ -235,6 +235,6 @@ class TestAnalysisAPI:
 
         body = response.json()
 
-        assert body["status"] == "COMPLETED"
+        assert body["status"] == "COMPLETED" 
         assert body["result"]["overview"]["rowCount"] == 3
-        assert body["result"]["overview"]["columnCount"] == 2
+        assert body["result"]["overview"]["columnCount"] == 2 
