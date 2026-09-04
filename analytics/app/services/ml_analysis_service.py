@@ -3,6 +3,7 @@ import pandas as pd
 from app.services.analysis_service import AnalysisService
 from app.loaders.dataset_loader import DatasetLoader
 from app.models.ml_problem_type import MLProblemType
+from app.services.model_evaluation_service import ModelEvaluationService
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LinearRegression, LogisticRegression
@@ -49,6 +50,7 @@ class MLAnalysisService(AnalysisService):
 
     def __init__(self, dataset_loader: DatasetLoader):
         self.dataset_loader = dataset_loader 
+        self.evaluation_service = ModelEvaluationService()
 
     def _analyze_class_distribution(
             self,
@@ -677,8 +679,43 @@ class MLAnalysisService(AnalysisService):
         pipeline.fit(X_train, y_train)
 
         #Evaluating the model
-        predictions = pipeline.predict(X_test)
+        predictions = pd.Series(
+            pipeline.predict(X_test),
+            index=y_test.index
+        )
 
+        #classification probability / decision scores
+
+        y_score = None
+
+        if problem_type == MLProblemType.CLASSIFICATION:
+
+            if hasattr(
+                pipeline,
+                "predict_proba"
+            ):
+                y_score = pipeline.predict_proba(X_test)
+
+                #Binary Classification
+
+                if y_score.shape[1] == 2:
+                    y_score = y_score[:, 1]
+
+            elif hasattr(
+                pipeline,
+                "decision_function"
+            ):
+                y_score = pipeline.decision_function(
+                    X_test
+                )
+
+        #advanced model evaluation
+        evaluation = self.evaluation_service.evaluate(
+            y_test,
+            predictions,
+            problem_type.value,
+            y_score
+        )
         #calculating Feature Importance
         feature_importance = self._get_feature_importance(pipeline) 
 
@@ -718,6 +755,7 @@ class MLAnalysisService(AnalysisService):
                     )
                     
                 },
+                "evaluation": evaluation,
                 "featureImportance": feature_importance
             }
 
@@ -727,7 +765,7 @@ class MLAnalysisService(AnalysisService):
             "model":best_model_name,
             "modelComparison": comparison_results,
             "tuning": tuning_response,
-            
+
             "metrics": {
                 "mean_squared_error": round(
                     float(mse), 4
@@ -743,6 +781,8 @@ class MLAnalysisService(AnalysisService):
                     float(r2_score(y_test, predictions)),4
                 )
             },
+            "evaluation": evaluation,
+            
             "featureImportance": feature_importance
         }
 

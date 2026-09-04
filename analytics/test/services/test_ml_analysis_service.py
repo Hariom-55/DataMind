@@ -197,9 +197,9 @@ class TestMLAnalysisService:
             "35,50000,1\n"
             "40,60000,1\n"
             "45,70000,1\n"
-            "50,80000,1\n"
+            "50,80000,0\n"
             "55,90000,1\n"
-            "60,100000,1\n"
+            "60,100000,0\n"
             "65,110000,1\n"
         )
 
@@ -825,9 +825,73 @@ class TestMLAnalysisService:
 
         assert "model__min_samples_split" in parameters
 
+    def test_train_model_includes_advanced_classification_evaluation(self):
 
-    
+
+        df = pd.DataFrame({
+            "feature_1": [1, 2, 3, 4, 5, 6, 7, 8],
+            "feature_2": [8, 7, 6, 5, 4, 3, 2, 1],
+            "target": [
+                "A", "A", "A", "A",
+                "B", "B", "B", "B"
+            ]
+        })
+
+        result = self.service._train_model(
+            df=df,
+            target_column="target",
+            problem_type=MLProblemType.CLASSIFICATION
+        )
+
+        assert "evaluation" in result
+
+        evaluation = result["evaluation"]
+
+        assert "confusionMatrix" in evaluation
+        assert "classificationReport" in evaluation
+
+        assert isinstance(
+            evaluation["confusionMatrix"],
+            list
+        )
+
+        assert isinstance(
+            evaluation["classificationReport"],
+            dict
+        )
+
+    def test_train_model_includes_advanced_regression_evaluation(self):
+
+        df = pd.DataFrame({
+            "feature_1": [1, 2, 3, 4, 5, 6, 7, 8],
+            "feature_2": [2, 4, 6, 8, 10, 12, 14, 16],
+            "target": [
+                10, 20, 30, 40,
+                50, 60, 70, 80
+            ]
+        })
+
+        result = self.service._train_model(
+            df=df,
+            target_column="target",
+            problem_type=MLProblemType.REGRESSION
+        )
+
+        assert "evaluation" in result
+
+        evaluation = result["evaluation"]
+
+        assert "meanSquaredError" in evaluation
+        assert "meanAbsoluteError" in evaluation
+        assert "rootMeanSquaredError" in evaluation
+        assert "r2Score" in evaluation
+
+        assert "residualAnalysis" in evaluation
+        assert "errorDistribution" in evaluation
+
 
         
 
-              
+            
+
+                
