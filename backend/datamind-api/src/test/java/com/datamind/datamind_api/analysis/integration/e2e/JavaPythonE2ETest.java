@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
+import java.util.List;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -27,6 +28,10 @@ import com.datamind.datamind_api.analysis.repository.AnalysisResultRepository;
 import com.datamind.datamind_api.analysis.worker.AnalysisJobWorker;
 import com.datamind.datamind_api.dataset.entity.Dataset;
 import com.datamind.datamind_api.dataset.repository.DatasetRepository;
+import com.datamind.datamind_api.analysis.integration.python.dto.PythonCleaningOperation;
+import com.datamind.datamind_api.dataset.entity.DatasetLineage;
+import com.datamind.datamind_api.dataset.repository.DatasetLineageRepository;
+import com.datamind.datamind_api.dataset.service.DatasetCleaningOrchestrationService;
 
 @SpringBootTest(
         properties = {
@@ -47,6 +52,12 @@ class JavaPythonE2ETest
 
     @Autowired
     private AnalysisJobWorker analysisJobWorker;
+
+    @Autowired
+    private DatasetCleaningOrchestrationService datasetCleaningOrchestrationService;
+
+    @Autowired
+    private DatasetLineageRepository datasetLineageRepository;
 
 
     @Test
@@ -645,6 +656,177 @@ class JavaPythonE2ETest
             assertEquals(
                     3,
                     ((java.util.List<?>) resultData.get("columns")).size()
+            );
+        }
+        finally
+        {
+            Files.deleteIfExists(datasetPath);
+        }
+    }
+
+    @Test
+    void shouldCreateCleanedDatasetVersionThroughPythonCleaning()
+            throws Exception
+    {
+        // Arrange
+
+        Path datasetPath = Files.createTempFile(
+                "datamind-cleaning-e2e-",
+                ".csv"
+        );
+
+        try
+        {
+            Files.writeString(
+                    datasetPath,
+                    """
+                    name,age,city
+                    Hariom,,
+                    Rahul,24,Mumbai
+                    Hariom,22,Delhi
+                    """
+            );
+
+            Dataset parentDataset = new Dataset(
+                    "cleaning-e2e.csv",
+                    "cleaning-e2e-" + UUID.randomUUID(),
+                    Files.size(datasetPath),
+                    "text/csv"
+            );
+
+            parentDataset.setStoragePath(
+                    datasetPath.toAbsolutePath().toString()
+            );
+
+            parentDataset =
+                    datasetRepository.saveAndFlush(
+                            parentDataset
+                    );
+
+            List<PythonCleaningOperation> operations =
+                    List.of(
+                            new PythonCleaningOperation(
+                                    "IMPUTE_MISSING_VALUES",
+                                    "age"
+                            )
+                    );
+
+            // Act
+
+            Dataset cleanedDataset =
+                    datasetCleaningOrchestrationService.cleanDataset(
+                            parentDataset,
+                            operations
+                    );
+
+            // Assert — Dataset version
+
+            assertNotNull(cleanedDataset);
+
+            assertNotNull(cleanedDataset.getId());
+
+            assertEquals(
+                    "cleaning-e2e.csv_cleaned",
+                    cleanedDataset.getName()
+            );
+
+            assertNotNull(
+                    cleanedDataset.getContentHash()
+            );
+
+            assertEquals(
+                    "csv",
+                    cleanedDataset.getFileType()
+            );
+
+            assertNotNull(
+                    cleanedDataset.getStoragePath()
+            );
+
+            // Assert — stored file
+
+            Path cleanedFile =
+                    Path.of(
+                            cleanedDataset.getStoragePath()
+                    );
+
+            assertTrue(
+                    Files.exists(cleanedFile)
+            );
+
+            assertTrue(
+                    Files.size(cleanedFile) > 0
+            );
+
+            String cleanedContent =
+                    Files.readString(cleanedFile);
+
+            assertTrue(
+                    cleanedContent.contains(
+                            "Hariom,22"
+                    )
+            );
+
+            assertTrue(
+                    cleanedContent.contains(
+                            "Rahul,24"
+                    )
+            );
+
+            // Assert — lineage
+
+            List<DatasetLineage> lineage =
+                    datasetLineageRepository
+                            .findByParentDatasetOrderByCreatedAtAsc(
+                                    parentDataset
+                            );
+
+            assertEquals(
+                    1,
+                    lineage.size()
+            );
+
+            DatasetLineage lineageEntry =
+                    lineage.get(0);
+
+            assertEquals(
+                    parentDataset.getId(),
+                    lineageEntry
+                            .getParentDataset()
+                            .getId()
+            );
+
+            assertEquals(
+                    cleanedDataset.getId(),
+                    lineageEntry
+                            .getChildDataset()
+                            .getId()
+            );
+
+            assertEquals(
+                    "IMPUTE_MISSING_VALUES",
+                    lineageEntry.getOperation()
+            );
+
+            assertNull(
+                    lineageEntry.getColumnName()
+            );
+
+            assertEquals(
+                    1,
+                    lineageEntry.getRowsAffected()
+            );
+
+            assertNotNull(
+                    lineageEntry.getDetails()
+            );
+
+            assertTrue(
+                    lineageEntry
+                            .getDetails()
+                            .contains(
+                                    "IMPUTE_MISSING_VALUES"
+                            )
             );
         }
         finally

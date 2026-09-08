@@ -108,4 +108,103 @@ class DatasetStorageServiceTest
 
         assertTrue(Files.exists(expectedPath));
     }
+
+    @Test
+    void shouldStoreBytesWithHashAsFilename()
+    {
+        DatasetStorageService storageService =
+                new DatasetStorageService(tempDirectory.toString());
+
+        String contentHash =
+                "cleaned123456";
+
+        byte[] content =
+                "name,age\nHariom,22".getBytes();
+
+        String storedPath =
+                storageService.storeBytes(
+                        content,
+                        contentHash,
+                        ".csv"
+                );
+
+        Path expectedPath =
+                tempDirectory.resolve(
+                        "cleaned123456.csv"
+                );
+
+        assertEquals(
+                expectedPath.toString(),
+                storedPath
+        );
+
+        assertTrue(
+                Files.exists(expectedPath)
+        );
+    }
+
+    @Test
+    void shouldPreserveStoredByteContent()
+            throws Exception
+    {
+        DatasetStorageService storageService =
+                new DatasetStorageService(tempDirectory.toString());
+
+        String contentHash =
+                "cleaned123456";
+
+        byte[] content =
+                "name,age\nHariom,22".getBytes();
+
+        String storedPath =
+                storageService.storeBytes(
+                        content,
+                        contentHash,
+                        ".csv"
+                );
+
+        byte[] storedContent =
+                Files.readAllBytes(
+                        Path.of(storedPath)
+                );
+
+        assertArrayEquals(
+                content,
+                storedContent
+        );
+    }
+
+    @Test
+    void shouldNormalizeExtension()
+    {
+        DatasetStorageService storageService =
+                new DatasetStorageService(tempDirectory.toString());
+
+        String contentHash =
+                "cleaned123456";
+
+        byte[] content =
+                "sample data".getBytes();
+
+        String storedPath =
+                storageService.storeBytes(
+                        content,
+                        contentHash,
+                        "csv"
+                );
+
+        Path expectedPath =
+                tempDirectory.resolve(
+                        "cleaned123456.csv"
+                );
+
+        assertEquals(
+                expectedPath.toString(),
+                storedPath
+        );
+
+        assertTrue(
+                Files.exists(expectedPath)
+        );
+    }
 }

@@ -57,4 +57,46 @@ public class DatasetStorageService {
             );
         }
     }
+
+    public String storeBytes(
+            byte[] content,
+            String contentHash,
+            String extension
+    ) {
+
+        try {
+
+            Files.createDirectories(storageDirectory);
+
+            String normalizedExtension = "";
+
+            if (extension != null && !extension.isBlank()) {
+
+                normalizedExtension =
+                        extension.startsWith(".")
+                                ? extension
+                                : "." + extension;
+            }
+
+            String storedFilename =
+                    contentHash + normalizedExtension;
+
+            Path targetPath =
+                    storageDirectory.resolve(storedFilename);
+
+            Files.write(
+                    targetPath,
+                    content
+            );
+
+            return targetPath.toString();
+
+        } catch (IOException e) {
+
+            throw new RuntimeException(
+                    "Failed to store dataset bytes",
+                    e
+            );
+        }
+    }
 }
