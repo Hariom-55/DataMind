@@ -230,3 +230,339 @@ class TestStatisticalAnalysisService:
 
         assert result["correlations"]["pearson"] == {}
         assert result["correlations"]["spearman"] == {}
+
+    def test_should_generate_missing_value_statistics(
+            self,
+            tmp_path
+    ):
+
+        dataset = pd.DataFrame({
+            "age": [20, 30, None, 50, 60]
+        })
+
+        file_path = tmp_path / "test.csv"
+        dataset.to_csv(file_path, index=False)
+
+        result = self.service.analyze(str(file_path))
+
+        statistics = result["descriptiveStatistics"]["age"]
+
+        assert statistics["count"] == 4
+        assert statistics["missingCount"] == 1
+        assert statistics["missingPercentage"] == pytest.approx(20.0)
+
+    def test_should_generate_range(
+            self,
+            tmp_path
+    ):
+
+        dataset = pd.DataFrame({
+            "age": [20, 30, 40, 50, 60]
+        })
+
+        file_path = tmp_path / "test.csv"
+        dataset.to_csv(file_path, index=False)
+
+        result = self.service.analyze(str(file_path))
+
+        statistics = result["descriptiveStatistics"]["age"]
+
+        assert statistics["range"] == pytest.approx(40.0)
+
+    def test_should_generate_iqr(
+            self,
+            tmp_path
+    ):
+
+        dataset = pd.DataFrame({
+            "age": [20, 30, 40, 50, 60]
+        })
+
+        file_path = tmp_path / "test.csv"
+        dataset.to_csv(file_path, index=False)
+
+        result = self.service.analyze(str(file_path))
+
+        statistics = result["descriptiveStatistics"]["age"]
+
+        assert statistics["IQR"] == pytest.approx(20.0)
+
+    def test_should_generate_mode(
+            self,
+            tmp_path
+    ):
+
+        dataset = pd.DataFrame({
+            "age": [20, 30, 30, 40, 50]
+        })
+
+        file_path = tmp_path / "test.csv"
+        dataset.to_csv(file_path, index=False)
+
+        result = self.service.analyze(str(file_path))
+
+        statistics = result["descriptiveStatistics"]["age"]
+
+        assert statistics["mode"] == pytest.approx(30.0)
+
+    def test_should_handle_constant_numeric_column(
+            self,
+            tmp_path
+    ):
+
+        dataset = pd.DataFrame({
+            "age": [30, 30, 30, 30, 30]
+        })
+
+        file_path = tmp_path / "test.csv"
+        dataset.to_csv(file_path, index=False)
+
+        result = self.service.analyze(str(file_path))
+
+        statistics = result["descriptiveStatistics"]["age"]
+
+        assert statistics["count"] == 5
+        assert statistics["mean"] == pytest.approx(30.0)
+        assert statistics["median"] == pytest.approx(30.0)
+        assert statistics["mode"] == pytest.approx(30.0)
+        assert statistics["range"] == pytest.approx(0.0)
+        assert statistics["IQR"] == pytest.approx(0.0)
+
+    def test_correlation_analysis_identifies_strong_positive_relationship(
+        self,
+        tmp_path
+    ):
+        dataset_path = tmp_path / "correlation.csv"
+
+        dataset_path.write_text(
+            """age,salary
+                20,20000
+                30,30000
+                40,40000
+                50,50000
+                60,60000
+            """
+        )
+
+        result = self.service.analyze(str(dataset_path))
+
+        strongest = result["correlationAnalysis"]["pearson"]["strongest"]
+
+        assert len(strongest) == 1
+
+        pair = strongest[0]
+
+        assert pair["column1"] == "age"
+        assert pair["column2"] == "salary"
+        assert pair["correlation"] == 1.0
+        assert pair["strength"] == "VERY_STRONG"
+        assert pair["direction"] == "POSITIVE"
+
+    def test_correlation_analysis_identifies_strong_negative_relationship(
+        self,
+        tmp_path
+    ):
+        dataset_path = tmp_path / "negative_correlation.csv"
+
+        dataset_path.write_text(
+            """age,performance
+                20,100
+                30,80
+                40,60
+                50,40
+                60,20
+            """
+        )
+
+        result = self.service.analyze(str(dataset_path))
+
+        strongest = result["correlationAnalysis"]["pearson"]["strongest"]
+
+        assert len(strongest) == 1
+
+        pair = strongest[0]
+
+        assert pair["column1"] == "age"
+        assert pair["column2"] == "performance"
+        assert pair["correlation"] == -1.0
+        assert pair["strength"] == "VERY_STRONG"
+        assert pair["direction"] == "NEGATIVE"   
+
+    def test_correlation_analysis_does_not_return_duplicate_pairs(
+        self,
+        tmp_path
+    ):
+        dataset_path = tmp_path / "duplicate_pairs.csv"
+
+        dataset_path.write_text(
+            """age,salary,experience
+                20,20000,1
+                30,30000,2
+                40,40000,3
+                50,50000,4
+                60,60000,5
+            """
+        )
+
+        result = self.service.analyze(str(dataset_path))
+
+        pairs = result["correlationAnalysis"]["pearson"]["pairs"]
+
+        assert len(pairs) == 3
+
+    def test_correlation_analysis_sorts_strongest_relationships_by_absolute_correlation(
+        self,
+        tmp_path
+    ):
+        dataset_path = tmp_path / "sorted_correlations.csv"
+
+        dataset_path.write_text(
+            """a,b,c
+                1,1,5
+                2,2,4
+                3,4,3
+                4,8,2
+                5,16,1
+            """
+        )
+
+        result = self.service.analyze(str(dataset_path))
+
+        strongest = result["correlationAnalysis"]["pearson"]["strongest"]
+
+        correlations = [
+            abs(pair["correlation"])
+            for pair in strongest
+        ]
+
+        assert correlations == sorted(
+            correlations,
+            reverse=True
+        )
+
+    def test_correlation_analysis_is_empty_without_numeric_columns(
+        self,
+        tmp_path
+    ):
+        dataset_path = tmp_path / "categorical.csv"
+
+        dataset_path.write_text(
+            """name,city
+                Hariom,Delhi
+                Rahul,Mumbai
+                Aman,Pune
+            """
+        )
+
+        result = self.service.analyze(str(dataset_path))
+
+        correlation_analysis = result["correlationAnalysis"]
+
+        assert correlation_analysis["pearson"]["pairs"] == []
+        assert correlation_analysis["pearson"]["strongest"] == []
+
+        assert correlation_analysis["spearman"]["pairs"] == []
+        assert correlation_analysis["spearman"]["strongest"] == []
+
+    def test_correlation_analysis_handles_constant_column(
+        self,
+        tmp_path
+    ):
+        dataset_path = tmp_path / "constant_correlation.csv"
+
+        dataset_path.write_text(
+            """age,constant
+                20,1
+                30,1
+                40,1
+                50,1
+                60,1
+            """
+        )
+
+        result = self.service.analyze(str(dataset_path))
+
+        pairs = result["correlationAnalysis"]["pearson"]["pairs"]
+
+        assert pairs == []
+
+    def test_correlation_analysis_handles_zero_correlation(
+        self,
+        tmp_path
+    ):
+        dataset_path = tmp_path / "zero_correlation.csv"
+
+        dataset_path.write_text(
+            """x,y
+               1,1
+               2,-2
+               3,0
+               4,2
+               5,-1
+            """
+        )
+
+        result = self.service.analyze(str(dataset_path))
+
+        pairs = result["correlationAnalysis"]["pearson"]["pairs"]
+
+        assert len(pairs) == 1
+
+        pair = pairs[0]
+
+        assert pair["correlation"] == 0.0
+        assert pair["direction"] == "NONE"
+        assert pair["strength"] == "VERY_WEAK"
+
+    def test_correlation_strength_classification(self):
+        assert (
+            self.service._correlation_strength(0.10)
+            == "VERY_WEAK"
+        )
+
+        assert (
+            self.service._correlation_strength(0.20)
+            == "WEAK"
+        )
+
+        assert (
+            self.service._correlation_strength(0.40)
+            == "MODERATE"
+        )
+
+        assert (
+            self.service._correlation_strength(0.60)
+            == "STRONG"
+        )
+
+        assert (
+            self.service._correlation_strength(0.80)
+            == "VERY_STRONG"
+        )
+
+    def test_correlation_strength_uses_absolute_value(self):
+        assert (
+            self.service._correlation_strength(-0.85)
+            == "VERY_STRONG"
+        )
+
+        assert (
+            self.service._correlation_strength(-0.55)
+            == "MODERATE"
+        )
+
+    def test_correlation_direction_classification(self):
+        assert (
+            self.service._correlation_direction(0.75)
+            == "POSITIVE"
+        )
+
+        assert (
+            self.service._correlation_direction(-0.75)
+            == "NEGATIVE"
+        )
+
+        assert (
+            self.service._correlation_direction(0.0)
+            == "NONE"
+        )

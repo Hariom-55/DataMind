@@ -413,10 +413,6 @@ class JavaPythonE2ETest
                     resultData.containsKey("descriptiveStatistics")
             );
 
-            assertTrue(
-                    resultData.containsKey("correlations")
-            );
-
             Map<String, Object> descriptiveStatistics =
                     (Map<String, Object>)
                             resultData.get("descriptiveStatistics");
@@ -444,6 +440,11 @@ class JavaPythonE2ETest
                     0.001
             );
 
+
+            assertTrue(
+                    resultData.containsKey("correlations")
+            );
+
             Map<String, Object> correlations =
                     (Map<String, Object>)
                             resultData.get("correlations");
@@ -469,12 +470,117 @@ class JavaPythonE2ETest
                     ((Number) agePearson.get("salary")).doubleValue(),
                     0.001
             );
+
+            assertTrue(
+                    resultData.containsKey("correlationAnalysis")
+            );
+
+            Map<String, Object> correlationAnalysis =
+                    (Map<String, Object>)
+                            resultData.get("correlationAnalysis");
+
+            assertTrue(
+                    correlationAnalysis.containsKey("pearson")
+            );
+
+            assertTrue(
+                    correlationAnalysis.containsKey("spearman")
+            );
+
+            Map<String, Object> pearsonAnalysis =
+                    (Map<String, Object>)
+                            correlationAnalysis.get("pearson");
+
+            assertTrue(
+                    pearsonAnalysis.containsKey("pairs")
+            );
+
+            assertTrue(
+                    pearsonAnalysis.containsKey("strongest")
+            );
+
+            List<?> pearsonPairs =
+                    (List<?>)
+                            pearsonAnalysis.get("pairs");
+
+            assertEquals(
+                    1,
+                    pearsonPairs.size()
+            );
+
+            Map<String, Object> pearsonPair =
+                    (Map<String, Object>)
+                            pearsonPairs.get(0);
+
+            assertEquals(
+                    "age",
+                    pearsonPair.get("column1")
+            );
+
+            assertEquals(
+                    "salary",
+                    pearsonPair.get("column2")
+            );
+
+            assertEquals(
+                    1.0,
+                    ((Number) pearsonPair.get("correlation")).doubleValue(),
+                    0.001
+            );
+
+            assertEquals(
+                    "VERY_STRONG",
+                    pearsonPair.get("strength")
+            );
+
+            assertEquals(
+                    "POSITIVE",
+                    pearsonPair.get("direction")
+            );
+
+            List<?> strongestPearson =
+                    (List<?>)
+                            pearsonAnalysis.get("strongest");
+
+            assertEquals(
+                    1,
+                    strongestPearson.size()
+            );
+
+            Map<String, Object> strongestPair =
+                    (Map<String, Object>)
+                            strongestPearson.get(0);
+
+            assertEquals(
+                    "age",
+                    strongestPair.get("column1")
+            );
+
+            assertEquals(
+                    "salary",
+                    strongestPair.get("column2")
+            );
+
+            assertEquals(
+                    1.0,
+                    ((Number) strongestPair.get("correlation")).doubleValue(),
+                    0.001
+            );
+
+            assertEquals(
+                    "VERY_STRONG",
+                    strongestPair.get("strength")
+            );
+
+            assertEquals(
+                    "POSITIVE",
+                    strongestPair.get("direction")
+            );
         }
         catch (Exception exception)
         {
             throw new RuntimeException(exception);
         }
-
     }
 
     @Test
