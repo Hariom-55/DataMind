@@ -3,19 +3,19 @@ from uuid import UUID
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
-from app.models.analysis_request import AnalysisRequest
-from app.services.eda_service import EDAService
-from app.services.statistical_service import StatisticalAnalysisService
-from app.services.analysis_registry import AnalysisRegistry
+from app.schemas.analysis_request import AnalysisRequest
+from app.services.profiling.eda_service import EDAService
+from app.services.statistical.statistical_service import StatisticalAnalysisService
+from app.registry.analysis_registry import AnalysisRegistry
 from app.loaders.dataset_loader import DatasetLoader
-from app.services.data_quality_service import DataQualityService
-from app.services.ml_analysis_service import MLAnalysisService
-from app.models.clean_dataset_request import CleanDatasetRequest
-from app.services.dataset_cleaning_service import DatasetCleaningService
-from app.services.data_cleaning_workflow_service import DataCleaningWorkflowService
-from app.services.data_quality_service import DataQualityService
-from app.services.data_cleaning_services import DataCleaningService
-from app.services.cleaned_dataset_response_service import CleanedDatasetResponseService
+from app.services.profiling.data_quality_service import DataQualityService
+from app.services.machine_learning.ml_analysis_service import MLAnalysisService
+from app.schemas.clean_dataset_request import CleanDatasetRequest
+from app.services.cleaning.dataset_cleaning_service import DatasetCleaningService
+from app.services.cleaning.cleaning_workflow_service import DataCleaningWorkflowService
+from app.services.profiling.data_quality_service import DataQualityService
+from app.services.cleaning.cleaning_service import DataCleaningService
+from app.services.cleaning.cleaned_dataset_response_service import CleanedDatasetResponseService
 
 router = APIRouter()
 
