@@ -513,3 +513,65 @@ class TestStatisticalAnalysisService:
         assert pair["correlation"] == 0.0
         assert pair["direction"] == "NONE"
         assert pair["strength"] == "VERY_WEAK"
+
+    def test_should_generate_distribution_analysis(
+        self, 
+        tmp_path
+    ):
+
+        dataset = pd.DataFrame({
+            "age":[
+                20,21,22,23,24,
+                25,26,27,28,29
+            ]
+        })
+
+        file_path = tmp_path/"distribution.csv"
+
+        dataset.to_csv(file_path, index = False)
+
+        result = self.service.analyze(str(file_path))
+
+        assert "distributions" in result
+
+        assert "age" in result["distributions"]
+
+    def test_should_preserve_existing_statistical_results(
+        self,
+        tmp_path
+    ):
+        dataset = pd.DataFrame({
+            "age":[
+                20,30,40,50,60
+            ],
+
+            "salary":[
+                20000,
+                30000,
+                40000,
+                50000,
+                6000
+            ]
+        })
+
+        file_path = tmp_path / "statistics.csv"
+
+        dataset.to_csv(file_path, index =False)
+
+        result = self.service.analyze(str(file_path)) 
+
+        assert "descriptiveStatistics" in result
+
+        assert "age" in result["descriptiveStatistics"]
+
+        assert "correlations" in result
+
+        assert "pearson" in result["correlations"]
+
+        assert "correlationAnalysis" in result
+
+        assert "distributions" in result
+
+        assert "age" in result["distributions"]
+
+        assert "salary" in result["distributions"]

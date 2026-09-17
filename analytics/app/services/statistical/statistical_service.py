@@ -2,7 +2,7 @@ from app.loaders.dataset_loader import DatasetLoader
 from app.core.analysis_service import AnalysisService
 from app.services.statistical.descriptive_service import DescriptiveStatisticsService
 from app.services.statistical.correlation_service import CorrelationService
-
+from app.services.statistical.distribution_service import DistributionAnalysisService
 
 class StatisticalAnalysisService(AnalysisService):
 
@@ -10,6 +10,7 @@ class StatisticalAnalysisService(AnalysisService):
         self.dataset_loader = dataset_loader
         self.descriptive_service = DescriptiveStatisticsService()
         self.correlation_service = CorrelationService()
+        self.distribution_service = DistributionAnalysisService()
 
     def analyze(
             self,
@@ -17,8 +18,7 @@ class StatisticalAnalysisService(AnalysisService):
             file_type: str | None = None,
             target_column: str | None = None
     ) -> dict:
-        # target_column is accepted (and unused) only to satisfy the shared
-        # AnalysisService interface
+        
 
         #1.Load Dataset
         df = self.dataset_loader.load(dataset_path, file_type=file_type)
@@ -32,11 +32,15 @@ class StatisticalAnalysisService(AnalysisService):
         #4. Correlation matrices + analysis - delegated
         correlation_result = self.correlation_service.calculate(numeric_df)
 
+        #5. Distribution Analysis
+        distribution_result = self.distribution_service.analyze(numeric_df)
+
         return {
             "descriptiveStatistics": descriptive_statistics,
             "correlations": {
                 "pearson": correlation_result["pearson"],
                 "spearman": correlation_result["spearman"]
             },
-            "correlationAnalysis": correlation_result["correlationAnalysis"]
+            "correlationAnalysis": correlation_result["correlationAnalysis"],
+            "distributions": distribution_result["distributions"]
         }
