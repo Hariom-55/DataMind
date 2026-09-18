@@ -467,3 +467,73 @@ class TestAnalysisAPI:
         assert "name,age" in decoded_content
         assert "Hariom,22" in decoded_content
         assert "Rahul,24" in decoded_content
+
+    def test_should_run_insight_analysis_without_target(
+        self,
+        tmp_path
+    ):
+
+        dataset = pd.DataFrame({
+            "age": [
+                20, 21, 22, 23, 24,
+                25, 26, 27, 28, 29
+            ],
+
+            "salary": [
+                30000,
+                32000,
+                34000,
+                36000,
+                38000,
+                40000,
+                42000,
+                44000,
+                46000,
+                48000
+            ]
+        })
+
+        file_path = tmp_path / "insight.csv"
+
+        dataset.to_csv(
+            file_path,
+            index=False
+        )
+
+        response = client.post(
+            "/internal/analyze",
+            json={
+                "jobId": TEST_JOB_ID,
+                "datasetId": TEST_DATASET_ID,
+                "analysisType": "INSIGHT",
+                "datasetPath": str(file_path)
+            }
+        )
+
+        assert response.status_code == 200
+
+        body = response.json()
+
+        assert body["status"] == "COMPLETED"
+
+        assert body["error"] is None
+
+        assert "analysis" in body["result"]
+
+        assert "insights" in body["result"]
+
+        assert "eda" in (
+            body["result"]["analysis"]
+        )
+
+        assert "statistical" in (
+            body["result"]["analysis"]
+        )
+
+        assert "summary" in (
+            body["result"]["insights"]
+        )
+
+        assert "insights" in (
+            body["result"]["insights"]
+        )

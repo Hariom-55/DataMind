@@ -306,4 +306,95 @@ class AnalysisJobWorkerTest
                         anyMap()
                 );
     }
+
+    @Test
+    void shouldProcessInsightJobSuccessfully()
+    {
+        UUID jobId = UUID.randomUUID();
+        UUID datasetId = UUID.randomUUID();
+
+        Dataset dataset = mock(Dataset.class);
+
+        Map<String, Object> summary = new HashMap<>();
+        summary.put("totalInsights", 2);
+        summary.put("high", 1);
+        summary.put("medium", 1);
+        summary.put("low", 0);
+        summary.put("info", 0);
+
+        Map<String, Object> insight = new HashMap<>();
+        insight.put("id", "INSIGHT-001");
+        insight.put("category", "DATA_QUALITY");
+        insight.put("severity", "HIGH");
+        insight.put("source", "EDA");
+        insight.put("title", "High missing-value rate");
+
+        Map<String, Object> insightResult = new HashMap<>();
+        insightResult.put("summary", summary);
+        insightResult.put("insights", java.util.List.of(insight));
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("analysis", new HashMap<>());
+        result.put("insights", insightResult);
+
+        when(analysisJobService.claimNextPendingJob())
+                .thenReturn(Optional.of(job));
+
+        when(job.getId())
+                .thenReturn(jobId);
+
+        when(job.getDataset())
+                .thenReturn(dataset);
+
+        when(dataset.getId())
+                .thenReturn(datasetId);
+
+        when(job.getAnalysisType())
+                .thenReturn(AnalysisType.INSIGHT);
+
+        when(dataset.getStoragePath())
+                .thenReturn("./data/test.csv");
+
+        when(dataset.getFileType())
+                .thenReturn("text/csv");
+
+        when(pythonAnalysisClient.analyze(
+                jobId,
+                datasetId,
+                "INSIGHT",
+                "./data/test.csv",
+                "text/csv",
+                null
+        )).thenReturn(pythonResponse);
+
+        when(pythonResponse.getStatus())
+                .thenReturn("COMPLETED");
+
+        when(pythonResponse.getError())
+                .thenReturn(null);
+
+        when(pythonResponse.getResult())
+                .thenReturn(result);
+
+        analysisJobWorker.processPendingJob();
+
+        verify(pythonAnalysisClient)
+                .analyze(
+                        jobId,
+                        datasetId,
+                        "INSIGHT",
+                        "./data/test.csv",
+                        "text/csv",
+                        null
+                );
+
+        verify(analysisExecutionService)
+                .completeJob(
+                        jobId,
+                        result
+                );
+
+        verify(analysisJobService, never())
+                .failJob(any(), anyString());
+    }
 }

@@ -1,5 +1,24 @@
 package com.datamind.datamind_api.analysis.service;
 
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import com.datamind.datamind_api.analysis.entity.AnalysisJob;
 import com.datamind.datamind_api.analysis.entity.enums.AnalysisJobStatus;
 import com.datamind.datamind_api.analysis.entity.enums.AnalysisType;
@@ -7,18 +26,6 @@ import com.datamind.datamind_api.analysis.exception.AnalysisJobNotFoundException
 import com.datamind.datamind_api.analysis.repository.AnalysisJobRepository;
 import com.datamind.datamind_api.dataset.entity.Dataset;
 import com.datamind.datamind_api.dataset.service.DatasetService;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class AnalysisJobServiceTest {
@@ -223,5 +230,36 @@ public class AnalysisJobServiceTest {
 
         verify(analysisJobRepository)
                 .save(job);
+    }
+    
+    @Test 
+    void shouldCreateInsightAnalysisJob()
+    {
+        UUID datasetId = UUID.randomUUID();
+
+        Dataset dataset = mock(Dataset.class);
+
+        when(datasetService.getDatasetById(datasetId))
+                .thenReturn(dataset);
+
+        AnalysisJob saveJob = mock(AnalysisJob.class);
+
+        when(analysisJobRepository.save(any(AnalysisJob.class)))
+                .thenReturn(saveJob);
+
+        AnalysisJob result = analysisJobService.createAnalysisJob(
+                datasetId,
+                AnalysisType.INSIGHT,
+                null
+        );
+
+        assertNotNull(result);
+        assertSame(saveJob, result);
+
+        verify(datasetService)
+                .getDatasetById(datasetId);
+
+        verify(analysisJobRepository)
+                .save(any(AnalysisJob.class));
     }
 }

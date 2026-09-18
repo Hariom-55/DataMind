@@ -941,5 +941,133 @@ class JavaPythonE2ETest
         }
     }
 
+    @Test
+    void shouldCompleteInsightAnalysisJobThroughPython()
+            throws Exception
+    {
+        Path datasetPath = Files.createTempFile(
+                "datamind-insight-e2e-",
+                ".csv"
+        );
+
+        try
+        {
+            Files.writeString(
+                    datasetPath,
+                    """
+                    name,age,salary
+                    Hariom,21,20000
+                    Rahul,22,30000
+                    Aman,20,25000
+                    Rohan,25,50000
+                    Raj,24,45000
+                    """
+            );
+
+            Dataset dataset = new Dataset(
+                    "insight-e2e.csv",
+                    "e2e-insight-" + UUID.randomUUID(),
+                    Files.size(datasetPath),
+                    "text/csv"
+            );
+
+            dataset.setStoragePath(
+                    datasetPath.toAbsolutePath().toString()
+            );
+
+            dataset = datasetRepository.saveAndFlush(dataset);
+
+            AnalysisJob job = new AnalysisJob(
+                    dataset,
+                    AnalysisType.INSIGHT,
+                    AnalysisJobStatus.PENDING
+            );
+
+            job = analysisJobRepository.saveAndFlush(job);
+
+            UUID jobId = job.getId();
+
+            // Act
+            analysisJobWorker.processPendingJob();
+
+            // Assert — Job
+            AnalysisJob completedJob =
+                    analysisJobRepository
+                            .findById(jobId)
+                            .orElseThrow();
+
+            assertEquals(
+                    AnalysisJobStatus.COMPLETED,
+                    completedJob.getStatus()
+            );
+
+            // Assert — Result
+            AnalysisResult result =
+                    analysisResultRepository
+                            .findByJobId(jobId)
+                            .orElseThrow();
+
+            assertNotNull(result);
+            assertNotNull(result.getResultData());
+
+            Map<String, Object> resultData =
+                    result.getResultData();
+
+            // Insight layer must exist
+            assertTrue(
+                    resultData.containsKey("insights")
+            );
+
+            Map<String, Object> insights =
+                    (Map<String, Object>)
+                            resultData.get("insights");
+
+            assertNotNull(insights);
+
+            // Summary
+            assertTrue(
+                    insights.containsKey("summary")
+            );
+
+            Map<String, Object> summary =
+                    (Map<String, Object>)
+                            insights.get("summary");
+
+            assertNotNull(summary);
+
+            assertTrue(
+                    summary.containsKey("totalInsights")
+            );
+
+            // Insight list
+            assertTrue(
+                    insights.containsKey("insights")
+            );
+
+            List<?> insightList =
+                    (List<?>)
+                            insights.get("insights");
+
+            assertNotNull(insightList);
+
+            if (!insightList.isEmpty())
+            {
+                Map<String, Object> firstInsight =
+                        (Map<String, Object>)
+                                insightList.get(0);
+
+                assertNotNull(firstInsight.get("id"));
+                assertNotNull(firstInsight.get("category"));
+                assertNotNull(firstInsight.get("severity"));
+                assertNotNull(firstInsight.get("source"));
+                assertNotNull(firstInsight.get("title"));
+            }
+        }
+        finally
+        {
+            Files.deleteIfExists(datasetPath);
+        }
+    }
+
      
 }

@@ -16,6 +16,9 @@ from app.services.cleaning.cleaning_workflow_service import DataCleaningWorkflow
 from app.services.profiling.data_quality_service import DataQualityService
 from app.services.cleaning.cleaning_service import DataCleaningService
 from app.services.cleaning.cleaned_dataset_response_service import CleanedDatasetResponseService
+from app.services.insight.insight_engine import InsightEngine
+from app.services.insight.insight_orchestration_service import InsightOrchestrationService
+
 
 router = APIRouter()
 
@@ -26,6 +29,14 @@ eda_service = EDAService(dataset_loader, data_quality_service)
 statistical_service = StatisticalAnalysisService(dataset_loader)
 analysis_registry = AnalysisRegistry()
 ml_analysis_service = MLAnalysisService(dataset_loader)
+insight_engine = InsightEngine()
+
+insight_orchestration_service = InsightOrchestrationService(
+    eda_service,
+    statistical_service,
+    ml_analysis_service,
+    insight_engine
+)
 
 
 #analysis registry
@@ -42,6 +53,11 @@ analysis_registry.register(
 analysis_registry.register(
     "MACHINE_LEARNING",
     ml_analysis_service
+)
+
+analysis_registry.register(
+    "INSIGHT",
+    insight_orchestration_service
 )
 
 
