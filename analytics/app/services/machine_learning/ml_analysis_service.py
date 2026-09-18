@@ -591,7 +591,7 @@ class MLAnalysisService(AnalysisService):
                 "Dataset must have at least 4 rows for training"
             )
 
-        if problem_type ==MLProblemType.CLASSIFICATION:
+        if problem_type == MLProblemType.CLASSIFICATION:
 
             if y.nunique() < 2 :
                 raise ValueError(

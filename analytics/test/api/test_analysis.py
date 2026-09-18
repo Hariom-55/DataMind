@@ -472,13 +472,11 @@ class TestAnalysisAPI:
         self,
         tmp_path
     ):
-
         dataset = pd.DataFrame({
             "age": [
                 20, 21, 22, 23, 24,
                 25, 26, 27, 28, 29
             ],
-
             "salary": [
                 30000,
                 32000,
@@ -515,25 +513,237 @@ class TestAnalysisAPI:
         body = response.json()
 
         assert body["status"] == "COMPLETED"
-
         assert body["error"] is None
 
-        assert "analysis" in body["result"]
+        result = body["result"]
 
-        assert "insights" in body["result"]
 
-        assert "eda" in (
-            body["result"]["analysis"]
+        assert "analysis" in result
+
+        assert "eda" in result["analysis"]
+        assert "statistical" in result["analysis"]
+
+       
+        assert "machineLearning" not in result["analysis"]
+
+  
+        assert "insights" in result
+
+        assert "summary" in result["insights"]
+        assert "insights" in result["insights"]
+
+        assert "visualizations" in result
+
+        visualizations = result["visualizations"]
+
+        assert "visualizations" in visualizations
+
+        visualization_list = visualizations["visualizations"]
+
+        assert isinstance(
+            visualization_list,
+            list
         )
 
-        assert "statistical" in (
-            body["result"]["analysis"]
+        assert len(visualization_list) > 0
+
+        visualization_types = [
+            visualization["type"]
+            for visualization in visualization_list
+        ]
+
+        # EDA / statistical visualizations should exist
+        assert "BAR" in visualization_types
+        assert "HEATMAP" in visualization_types
+        assert "TABLE" in visualization_types
+
+        sources = {
+            visualization["metadata"]["source"]
+            for visualization in visualization_list
+            if "metadata" in visualization
+            and "source" in visualization["metadata"]
+        }
+
+        assert "EDA" in sources
+        assert "STATISTICS" in sources
+
+        correlation_visualizations = [
+            visualization
+            for visualization in visualization_list
+            if visualization.get("metadata", {}).get("metric")
+            in ("pearson", "spearman")
+        ]
+
+        assert len(correlation_visualizations) >= 1
+
+        for visualization in correlation_visualizations:
+
+            assert visualization["type"] == "HEATMAP"
+
+            assert visualization["metadata"]["source"] == "STATISTICS"
+
+            assert visualization["metadata"]["metric"] in (
+                "pearson",
+                "spearman"
+            )
+
+            assert isinstance(
+                visualization["data"],
+                list
+            )
+
+            assert len(visualization["data"]) > 0
+
+        distribution_visualizations = [
+            visualization
+            for visualization in visualization_list
+            if visualization.get("metadata", {}).get("metric")
+            == "distribution"
+        ]
+
+        assert len(distribution_visualizations) == 1
+
+        distribution_visualization = distribution_visualizations[0]
+
+        assert (
+            distribution_visualization["type"]
+            == "TABLE"
         )
 
-        assert "summary" in (
-            body["result"]["insights"]
+        assert (
+            distribution_visualization["title"]
+            == "Distribution Analysis"
         )
 
-        assert "insights" in (
-            body["result"]["insights"]
+        assert (
+            distribution_visualization["metadata"]["source"]
+            == "STATISTICS"
         )
+
+        assert isinstance(
+            distribution_visualization["data"],
+            list
+        )
+
+        assert len(
+            distribution_visualization["data"]
+        ) == 2
+
+
+        eda_visualizations = [
+            visualization
+            for visualization in visualization_list
+            if visualization.get("metadata", {}).get("source")
+            == "EDA"
+        ]
+
+        assert len(eda_visualizations) > 0
+
+        missing_value_visualizations = [
+            visualization
+            for visualization in eda_visualizations
+            if visualization.get("metadata", {}).get("metric")
+            == "missingValues"
+        ]
+
+        assert len(missing_value_visualizations) == 1
+
+        missing_values_visualization = (
+            missing_value_visualizations[0]
+        )
+
+        assert (
+            missing_values_visualization["type"]
+            == "BAR"
+        )
+
+        assert (
+            missing_values_visualization["title"]
+            == "Missing Values by Column"
+        )
+
+    def test_should_run_insight_analysis_with_target(
+        self,
+        tmp_path
+    ):
+        dataset = pd.DataFrame({
+            "age": [
+                20, 21, 22, 23, 24,
+                25, 26, 27, 28, 29,
+                30, 31, 32, 33, 34,
+                35, 36, 37, 38, 39, 40
+            ],
+            "salary": [
+                30000, 32000, 34000, 36000, 38000,
+                40000, 42000, 44000, 46000, 48000,
+                50000, 52000, 54000, 56000, 58000,
+                60000, 62000, 64000, 66000, 68000,
+                70000
+            ],
+            "target": [
+                0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0,
+                0, 1, 1, 1, 1,
+                1, 1, 1, 1, 1,
+                1
+            ]
+        })
+
+        file_path = tmp_path / "insight_ml.csv"
+
+        dataset.to_csv(
+            file_path,
+            index=False
+        )
+
+        response = client.post(
+            "/internal/analyze",
+            json={
+                "jobId": TEST_JOB_ID,
+                "datasetId": TEST_DATASET_ID,
+                "analysisType": "INSIGHT",
+                "datasetPath": str(file_path),
+                "targetColumn": "target"
+            }
+        )
+
+        assert response.status_code == 200
+
+        body = response.json()
+
+        assert body["status"] == "COMPLETED"
+        assert body["error"] is None
+
+        result = body["result"]
+
+
+        assert "analysis" in result
+
+        assert "eda" in result["analysis"]
+        assert "statistical" in result["analysis"]
+        assert "machineLearning" in result["analysis"]
+
+
+        assert "insights" in result
+        assert "visualizations" in result
+
+        visualization_list = (
+            result["visualizations"]["visualizations"]
+        )
+
+        assert isinstance(
+            visualization_list,
+            list
+        )
+
+        assert len(visualization_list) > 0
+
+        ml_visualizations = [
+            visualization
+            for visualization in visualization_list
+            if visualization.get("metadata", {}).get("source")
+            == "MACHINE_LEARNING"
+        ]
+
+        assert len(ml_visualizations) > 0
+

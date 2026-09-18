@@ -18,7 +18,7 @@ from app.services.cleaning.cleaning_service import DataCleaningService
 from app.services.cleaning.cleaned_dataset_response_service import CleanedDatasetResponseService
 from app.services.insight.insight_engine import InsightEngine
 from app.services.insight.insight_orchestration_service import InsightOrchestrationService
-
+from app.services.visualization.visualization_orchestration_service import VisualizationOrchestrationService
 
 router = APIRouter()
 
@@ -30,12 +30,15 @@ statistical_service = StatisticalAnalysisService(dataset_loader)
 analysis_registry = AnalysisRegistry()
 ml_analysis_service = MLAnalysisService(dataset_loader)
 insight_engine = InsightEngine()
+visualization_service = VisualizationOrchestrationService()
 
 insight_orchestration_service = InsightOrchestrationService(
     eda_service,
     statistical_service,
     ml_analysis_service,
-    insight_engine
+    insight_engine,
+    visualization_service
+
 )
 
 

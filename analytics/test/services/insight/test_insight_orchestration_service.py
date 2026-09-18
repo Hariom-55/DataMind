@@ -1,8 +1,7 @@
 from unittest.mock import Mock
 
 from app.services.insight.insight_engine import InsightEngine
-
-
+from app.services.visualization.visualization_orchestration_service import VisualizationOrchestrationService
 from app.services.insight.insight_orchestration_service import InsightOrchestrationService
 
 
@@ -12,20 +11,20 @@ class TestInsightOrchestrationService:
     def setup_method(self):
 
         self.eda_service = Mock()
-
         self.statistical_service = Mock()
-
         self.ml_service = Mock()
-
         self.insight_engine = Mock(
             spec=InsightEngine
         )
+        self.visualization_service = Mock()
+
 
         self.service = InsightOrchestrationService(
             eda_service=self.eda_service,
             statistical_service=self.statistical_service,
             ml_service=self.ml_service,
-            insight_engine=self.insight_engine
+            insight_engine=self.insight_engine,
+            visualization_service = self.visualization_service,
         )
 
         self.eda_result = {
@@ -328,3 +327,178 @@ class TestInsightOrchestrationService:
             )
 
         self.insight_engine.generate.assert_not_called()
+
+    def test_should_generate_visualizations_from_analysis_results(self):
+        self.eda_service.analyze.return_value = {
+            "overview": {
+                "rowCount": 100,
+                "columnCount": 2,
+            }
+        }
+
+        self.statistical_service.analyze.return_value = {
+            "descriptiveStatistics": {},
+            "correlations": {},
+            "correlationAnalysis": {},
+            "distributions": {},
+        }
+
+        self.visualization_service.generate.return_value = {
+            "visualizations": [
+                {
+                    "type": "BAR",
+                    "title": "Missing Values by Column",
+                }
+            ]
+        }
+
+        result = self.service.analyze(
+            "dataset.csv"
+        )
+
+        assert result["visualizations"] == {
+            "visualizations": [
+                {
+                    "type": "BAR",
+                    "title": "Missing Values by Column",
+                }
+            ]
+        }
+
+        self.visualization_service.generate.assert_called_once_with(
+            {
+                "eda": self.eda_service.analyze.return_value,
+                "statistical": self.statistical_service.analyze.return_value,
+            }
+        )
+
+
+    def test_should_pass_ml_results_to_visualization_service(self):
+        self.eda_service.analyze.return_value = {
+            "overview": {
+                "rowCount": 100,
+                "columnCount": 3,
+            }
+        }
+
+        self.statistical_service.analyze.return_value = {
+            "descriptiveStatistics": {},
+            "correlations": {},
+            "correlationAnalysis": {},
+            "distributions": {},
+        }
+
+        self.ml_service.analyze.return_value = {
+            "targetColumn": "target",
+            "problemType": "CLASSIFICATION",
+            "classDistribution": {
+                "distribution": {
+                    "0": 0.7,
+                    "1": 0.3,
+                },
+                "imbalanceDetected": False,
+            },
+            "training": {},
+        }
+
+        self.visualization_service.generate.return_value = {
+            "visualizations": []
+        }
+
+        self.service.analyze(
+            "dataset.csv",
+            target_column="target"
+        )
+
+        expected_analysis_results = {
+            "eda": self.eda_service.analyze.return_value,
+            "statistical": self.statistical_service.analyze.return_value,
+            "machineLearning": self.ml_service.analyze.return_value,
+        }
+
+        self.visualization_service.generate.assert_called_once_with(
+            expected_analysis_results
+        )
+
+    def test_should_not_include_ml_results_without_target_column(self):
+        self.visualization_service.generate.return_value = {
+            "visualizations": []
+        }
+
+        self.service.analyze(
+            "dataset.csv"
+        )
+
+        visualization_input = (
+            self.visualization_service
+            .generate
+            .call_args.args[0]
+        )
+
+        assert "eda" in visualization_input
+        assert "statistical" in visualization_input
+        assert "machineLearning" not in visualization_input
+
+        self.ml_service.analyze.assert_not_called()
+
+
+    def test_should_return_analysis_insights_and_visualizations(self):
+        insight_result = {
+            "summary": {
+                "totalInsights": 1,
+                "high": 0,
+                "medium": 1,
+                "low": 0,
+                "info": 0,
+            },
+            "insights": [
+                {
+                    "id": "INSIGHT-001",
+                    "category": "DATA_QUALITY",
+                    "severity": "MEDIUM",
+                }
+            ],
+        }
+
+        visualization_result = {
+            "visualizations": [
+                {
+                    "type": "BAR",
+                    "title": "Missing Values by Column",
+                }
+            ]
+        }
+
+        self.insight_engine.generate.return_value = insight_result
+        self.visualization_service.generate.return_value = (
+            visualization_result
+        )
+
+        result = self.service.analyze(
+            "dataset.csv"
+        )
+
+        assert result["insights"] == insight_result
+        assert result["visualizations"] == visualization_result
+
+
+    def test_should_use_same_analysis_results_for_insights_and_visualizations(
+        self,
+    ):
+        self.service.analyze(
+            "dataset.csv"
+        )
+
+        insight_input = (
+            self.insight_engine
+            .generate
+            .call_args.args[0]
+        )
+
+        visualization_input = (
+            self.visualization_service
+            .generate
+            .call_args.args[0]
+        )
+
+        assert insight_input is visualization_input
