@@ -2,6 +2,7 @@ package com.datamind.datamind_api.analysis.integration.python;
 
 import com.datamind.datamind_api.analysis.integration.python.dto.PythonAnalysisRequest;
 import com.datamind.datamind_api.analysis.integration.python.dto.PythonAnalysisResponse;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -9,14 +10,11 @@ import org.springframework.web.client.RestClientException;
 import java.util.UUID;
 
 @Component
-public class PythonAnalysisClient
-{
+public class PythonAnalysisClient {
     private static final String ANALYZE_PATH = "/internal/analyze";
-
     private final RestClient pythonRestClient;
 
-    public PythonAnalysisClient(RestClient pythonRestClient)
-    {
+    public PythonAnalysisClient(RestClient pythonRestClient) {
         this.pythonRestClient = pythonRestClient;
     }
 
@@ -25,8 +23,8 @@ public class PythonAnalysisClient
             UUID datasetId,
             String analysisType,
             String datasetPath,
-            String fileType)
-    {
+            String fileType
+    ) {
         return analyze(jobId, datasetId, analysisType, datasetPath, fileType, null);
     }
 
@@ -36,24 +34,28 @@ public class PythonAnalysisClient
             String analysisType,
             String datasetPath,
             String fileType,
-            String targetColumn)
-    {
+            String targetColumn
+    ) {
         PythonAnalysisRequest request = new PythonAnalysisRequest(
                 jobId, datasetId, analysisType, datasetPath, fileType, targetColumn
         );
 
-        try
-        {
-            return pythonRestClient
+        try {
+            PythonAnalysisResponse response = pythonRestClient
                     .post()
                     .uri(ANALYZE_PATH)
-                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .contentType(MediaType.APPLICATION_JSON)
                     .body(request)
                     .retrieve()
                     .body(PythonAnalysisResponse.class);
-        }
-        catch (RestClientException ex)
-        {
+
+            if (response == null) {
+                throw new PythonAnalysisException(
+                        "Python analysis service returned an empty response for jobId=" + jobId
+                );
+            }
+            return response;
+        } catch (RestClientException ex) {
             throw new PythonAnalysisException(
                     "Call to Python analysis service failed for jobId=" + jobId, ex
             );

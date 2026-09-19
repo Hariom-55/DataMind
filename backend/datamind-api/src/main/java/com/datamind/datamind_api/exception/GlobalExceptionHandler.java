@@ -3,10 +3,12 @@ package com.datamind.datamind_api.exception;
 import com.datamind.datamind_api.analysis.exception.AnalysisJobNotFoundException;
 import com.datamind.datamind_api.analysis.exception.AnalysisResultNotFoundException;
 import com.datamind.datamind_api.dataset.exception.DatasetNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @RestControllerAdvice
@@ -99,6 +101,26 @@ public class GlobalExceptionHandler
                 400,
                 "INVALID_REQUEST",
                 "Request body contains invalid or malformed data"
+        );
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDataIntegrityViolation(DataIntegrityViolationException exception) {
+        return new ErrorResponse(
+                409,
+                "DATA_INTEGRITY_VIOLATION",
+                "The requested operation conflicts with existing data"
+        );
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+    public ErrorResponse handleMaxUploadSizeExceeded(MaxUploadSizeExceededException exception) {
+        return new ErrorResponse(
+                413,
+                "FILE_TOO_LARGE",
+                "Dataset file exceeds the maximum allowed size"
         );
     }
 

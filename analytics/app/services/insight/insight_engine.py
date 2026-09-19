@@ -126,8 +126,13 @@ class InsightEngine:
         insights: list[dict]
     ) -> dict:
 
+        total = len(insights)
+
         summary = {
-            "totalInsights": len(insights),
+            # total is the public API contract used by the dashboard.
+            # totalInsights is retained for backward compatibility.
+            "total": total,
+            "totalInsights": total,
             "high": 0,
             "medium": 0,
             "low": 0,

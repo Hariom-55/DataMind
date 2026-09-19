@@ -219,7 +219,7 @@ class JavaPythonE2ETest
                 retriedJob.getRetryCount()
         );
 
-        assertNull(
+        assertNotNull(
                 retriedJob.getErrorMessage()
         );
 
@@ -326,7 +326,7 @@ class JavaPythonE2ETest
                 afterThirdAttempt.getCompletedAt()
         );
 
-        assertNull(
+        assertNotNull(
                 afterThirdAttempt.getStartedAt()
         );
 
@@ -634,7 +634,7 @@ class JavaPythonE2ETest
                 retriedJob.getRetryCount()
         );
 
-        assertNull(
+        assertNotNull(
                 retriedJob.getErrorMessage()
         );
 

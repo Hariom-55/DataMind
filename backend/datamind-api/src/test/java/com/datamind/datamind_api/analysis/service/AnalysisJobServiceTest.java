@@ -1,24 +1,5 @@
 package com.datamind.datamind_api.analysis.service;
 
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import org.mockito.junit.jupiter.MockitoExtension;
-
 import com.datamind.datamind_api.analysis.entity.AnalysisJob;
 import com.datamind.datamind_api.analysis.entity.enums.AnalysisJobStatus;
 import com.datamind.datamind_api.analysis.entity.enums.AnalysisType;
@@ -26,9 +7,23 @@ import com.datamind.datamind_api.analysis.exception.AnalysisJobNotFoundException
 import com.datamind.datamind_api.analysis.repository.AnalysisJobRepository;
 import com.datamind.datamind_api.dataset.entity.Dataset;
 import com.datamind.datamind_api.dataset.service.DatasetService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
-@ExtendWith(MockitoExtension.class)
-public class AnalysisJobServiceTest {
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
+class AnalysisJobServiceTest {
 
     @Mock
     private AnalysisJobRepository analysisJobRepository;
@@ -36,230 +31,221 @@ public class AnalysisJobServiceTest {
     @Mock
     private DatasetService datasetService;
 
-    @InjectMocks
     private AnalysisJobService analysisJobService;
 
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+        analysisJobService = new AnalysisJobService(
+                analysisJobRepository,
+                datasetService,
+                3,
+                Duration.ofMinutes(30)
+        );
+    }
+
     @Test
-    void shouldCreateAnalysisJob()
-    {
+    void shouldCreateAnalysisJob() {
         UUID datasetId = UUID.randomUUID();
-
         Dataset dataset = mock(Dataset.class);
-
-        when(datasetService.getDatasetById(datasetId))
-                .thenReturn(dataset);
-
         AnalysisJob savedJob = mock(AnalysisJob.class);
 
-        when(analysisJobRepository.save(any(AnalysisJob.class)))
-                .thenReturn(savedJob);
+        when(datasetService.getDatasetById(datasetId)).thenReturn(dataset);
+        when(analysisJobRepository.save(any(AnalysisJob.class))).thenReturn(savedJob);
 
         AnalysisJob result = analysisJobService.createAnalysisJob(
-                datasetId,
-                AnalysisType.EDA,
-                null
+                datasetId, AnalysisType.EDA, null
         );
 
-        assertNotNull(result);
         assertSame(savedJob, result);
-
-        verify(datasetService)
-                .getDatasetById(datasetId);
-
-        verify(analysisJobRepository)
-                .save(any(AnalysisJob.class));
+        verify(datasetService).getDatasetById(datasetId);
+        verify(analysisJobRepository).save(any(AnalysisJob.class));
     }
 
     @Test
-    void shouldGetAnalysisJobById()
-    {
-        UUID jobId = UUID.randomUUID();
+    void shouldTrimTargetColumnWhenCreatingJob() {
+        UUID datasetId = UUID.randomUUID();
+        Dataset dataset = mock(Dataset.class);
+        when(datasetService.getDatasetById(datasetId)).thenReturn(dataset);
+        when(analysisJobRepository.save(any(AnalysisJob.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
+        AnalysisJob result = analysisJobService.createAnalysisJob(
+                datasetId, AnalysisType.MACHINE_LEARNING, "  profit  "
+        );
+
+        assertEquals("profit", result.getTargetColumn());
+    }
+
+    @Test
+    void shouldRejectMachineLearningWithoutTargetColumn() {
+        UUID datasetId = UUID.randomUUID();
+        Dataset dataset = mock(Dataset.class);
+        when(datasetService.getDatasetById(datasetId)).thenReturn(dataset);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> analysisJobService.createAnalysisJob(
+                        datasetId, AnalysisType.MACHINE_LEARNING, "  "
+                )
+        );
+
+        assertEquals(
+                "targetColumn is required for MACHINE_LEARNING analysis",
+                exception.getMessage()
+        );
+        verify(analysisJobRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectNullAnalysisType() {
+        UUID datasetId = UUID.randomUUID();
+        Dataset dataset = mock(Dataset.class);
+        when(datasetService.getDatasetById(datasetId)).thenReturn(dataset);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> analysisJobService.createAnalysisJob(datasetId, null, null)
+        );
+
+        assertEquals("analysisType is required", exception.getMessage());
+        verify(analysisJobRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldGetAnalysisJobById() {
+        UUID jobId = UUID.randomUUID();
         AnalysisJob job = mock(AnalysisJob.class);
+        when(analysisJobRepository.findById(jobId)).thenReturn(Optional.of(job));
 
-        when(analysisJobRepository.findById(jobId))
-                .thenReturn(Optional.of(job));
-
-        AnalysisJob result = analysisJobService.getAnalysisJobById(jobId);
-
-        assertSame(job,result);
-
-        verify(analysisJobRepository)
-                .findById(jobId);
+        assertSame(job, analysisJobService.getAnalysisJobById(jobId));
+        verify(analysisJobRepository).findById(jobId);
     }
 
     @Test
-    void shouldThrowExceptionWhenAnalysisJobNotFound()
-    {
+    void shouldThrowExceptionWhenAnalysisJobNotFound() {
         UUID jobId = UUID.randomUUID();
-
-        when(analysisJobRepository.findById(jobId))
-                .thenReturn(Optional.empty());
+        when(analysisJobRepository.findById(jobId)).thenReturn(Optional.empty());
 
         assertThrows(
                 AnalysisJobNotFoundException.class,
                 () -> analysisJobService.getAnalysisJobById(jobId)
         );
-
-        verify(analysisJobRepository)
-                .findById(jobId);
     }
 
     @Test
-    void shouldClaimNextPendingJob()
-    {
+    void shouldClaimNextPendingJob() {
         AnalysisJob job = mock(AnalysisJob.class);
-
-        when(analysisJobRepository.findNextPendingJob(
-                AnalysisJobStatus.PENDING.name()
-        ))
+        when(analysisJobRepository.findNextPendingJob(AnalysisJobStatus.PENDING.name()))
                 .thenReturn(Optional.of(job));
 
-        Optional<AnalysisJob> result =
-                analysisJobService.claimNextPendingJob();
+        Optional<AnalysisJob> result = analysisJobService.claimNextPendingJob();
 
         assertTrue(result.isPresent());
         assertSame(job, result.get());
-
-        verify(analysisJobRepository)
-                .findNextPendingJob(AnalysisJobStatus.PENDING.name());
-
-        verify(job)
-                .markAsProcessing();
-
-        verify(analysisJobRepository)
-                .save(job);
+        verify(job).markAsProcessing();
+        verify(analysisJobRepository).save(job);
     }
 
     @Test
-    void shouldReturnEmptyWhenNoPendingJobExists()
-    {
-        when(analysisJobRepository.findNextPendingJob(
-                AnalysisJobStatus.PENDING.name()
-        )).thenReturn(Optional.empty());
+    void shouldReturnEmptyWhenNoPendingJobExists() {
+        when(analysisJobRepository.findNextPendingJob(AnalysisJobStatus.PENDING.name()))
+                .thenReturn(Optional.empty());
 
-        Optional<AnalysisJob> result =
-                analysisJobService.claimNextPendingJob();
-
-        assertTrue(result.isEmpty());
-
-        verify(analysisJobRepository)
-                .findNextPendingJob(AnalysisJobStatus.PENDING.name());
-
-        verify(analysisJobRepository, never())
-                .save(any());
+        assertTrue(analysisJobService.claimNextPendingJob().isEmpty());
+        verify(analysisJobRepository, never()).save(any());
     }
 
     @Test
-    void shouldCompleteJob()
-    {
+    void shouldCompleteJob() {
         UUID jobId = UUID.randomUUID();
         AnalysisJob job = mock(AnalysisJob.class);
-
-        when(analysisJobRepository.findById(jobId))
-                .thenReturn(Optional.of(job));
+        when(analysisJobRepository.findById(jobId)).thenReturn(Optional.of(job));
 
         analysisJobService.completeJob(jobId);
 
-        verify(job)
-                .markAsCompleted();
-
-        verify(analysisJobRepository)
-                .save(job);
+        verify(job).markAsCompleted();
+        verify(analysisJobRepository).save(job);
     }
 
     @Test
-    void shouldRetryFailedJobWhenRetryLimitNotReached()
-    {
+    void shouldRetryFailedJobWhenRetryLimitNotReached() {
         UUID jobId = UUID.randomUUID();
-
         AnalysisJob job = mock(AnalysisJob.class);
+        when(analysisJobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(job.getRetryCount()).thenReturn(1);
 
-        when(analysisJobRepository.findById(jobId))
-                .thenReturn(Optional.of(job));
+        analysisJobService.failJob(jobId, "Python analysis failed");
 
-        when(job.getRetryCount())
-                .thenReturn(1);
-
-        analysisJobService.failJob(
-                jobId,
-                "Python analysis failed"
-        );
-
-        verify(job)
-                .incrementRetryCount();
-
-        verify(job)
-                .retry();
-
-        verify(job ,never())
-                .markAsFailed(anyString());
-
-        verify(analysisJobRepository)
-                .save(job);
+        verify(job).incrementRetryCount();
+        verify(job).retry("Python analysis failed");
+        verify(job, never()).markAsFailed(anyString());
+        verify(analysisJobRepository).save(job);
     }
 
     @Test
-    void shouldMarkJobAsFailedWhenRetryLimitReached()
-    {
+    void shouldMarkJobAsFailedWhenRetryLimitReached() {
         UUID jobId = UUID.randomUUID();
-
         AnalysisJob job = mock(AnalysisJob.class);
+        when(analysisJobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(job.getRetryCount()).thenReturn(3);
 
-        when(analysisJobRepository.findById(jobId))
-                .thenReturn(Optional.of(job));
+        analysisJobService.failJob(jobId, "Python analysis failed");
 
-        when(job.getRetryCount())
-                .thenReturn(3);
-
-        String errorMessage = "Python analysis failed";
-
-        analysisJobService.failJob(
-                jobId,
-                errorMessage
-        );
-
-        verify(job)
-                .incrementRetryCount();
-
-        verify(job)
-                .markAsFailed(errorMessage);
-
-        verify(job, never())
-                .retry();
-
-        verify(analysisJobRepository)
-                .save(job);
+        verify(job).incrementRetryCount();
+        verify(job).markAsFailed("Python analysis failed");
+        verify(job, never()).retry(anyString());
+        verify(analysisJobRepository).save(job);
     }
-    
-    @Test 
-    void shouldCreateInsightAnalysisJob()
-    {
+
+    @Test
+    void shouldRecoverStaleJobs() {
+        AnalysisJob staleJob = mock(AnalysisJob.class);
+        when(staleJob.getRetryCount()).thenReturn(1);
+        when(analysisJobRepository.findByStatusAndStartedAtBefore(
+                eq(AnalysisJobStatus.PROCESSING), any(LocalDateTime.class)))
+                .thenReturn(List.of(staleJob));
+
+        int recovered = analysisJobService.recoverStaleJobs();
+
+        assertEquals(1, recovered);
+        verify(staleJob).incrementRetryCount();
+        verify(staleJob).retry("Job was recovered after exceeding the processing timeout");
+        verify(analysisJobRepository).saveAll(List.of(staleJob));
+    }
+
+    @Test
+    void shouldFailStaleJobWhenRetryLimitIsReached() {
+        AnalysisJob staleJob = mock(AnalysisJob.class);
+        when(staleJob.getRetryCount()).thenReturn(3);
+        when(analysisJobRepository.findByStatusAndStartedAtBefore(
+                eq(AnalysisJobStatus.PROCESSING), any(LocalDateTime.class)))
+                .thenReturn(List.of(staleJob));
+
+        assertEquals(1, analysisJobService.recoverStaleJobs());
+
+        verify(staleJob).incrementRetryCount();
+        verify(staleJob).markAsFailed(
+                "Job exceeded the maximum retry count after becoming stale"
+        );
+        verify(staleJob, never()).retry(anyString());
+        verify(analysisJobRepository).saveAll(List.of(staleJob));
+    }
+
+    @Test
+    void shouldCreateInsightAnalysisJob() {
         UUID datasetId = UUID.randomUUID();
-
         Dataset dataset = mock(Dataset.class);
+        AnalysisJob savedJob = mock(AnalysisJob.class);
 
-        when(datasetService.getDatasetById(datasetId))
-                .thenReturn(dataset);
-
-        AnalysisJob saveJob = mock(AnalysisJob.class);
-
-        when(analysisJobRepository.save(any(AnalysisJob.class)))
-                .thenReturn(saveJob);
+        when(datasetService.getDatasetById(datasetId)).thenReturn(dataset);
+        when(analysisJobRepository.save(any(AnalysisJob.class))).thenReturn(savedJob);
 
         AnalysisJob result = analysisJobService.createAnalysisJob(
-                datasetId,
-                AnalysisType.INSIGHT,
-                null
+                datasetId, AnalysisType.INSIGHT, null
         );
 
-        assertNotNull(result);
-        assertSame(saveJob, result);
-
-        verify(datasetService)
-                .getDatasetById(datasetId);
-
-        verify(analysisJobRepository)
-                .save(any(AnalysisJob.class));
+        assertSame(savedJob, result);
+        verify(analysisJobRepository).save(any(AnalysisJob.class));
     }
 }

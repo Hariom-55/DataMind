@@ -27,8 +27,12 @@ class EDAService(AnalysisService):
         columns = list(df.columns)
 
         data_types = {
-            column :str(dtype)
-            for column , dtype in df.dtypes.items()
+            column: (
+                "str"
+                if pd.api.types.is_object_dtype(dtype)
+                else str(dtype)
+            )
+            for column, dtype in df.dtypes.items()
         }
 
         #4. Missing Values 
@@ -79,8 +83,12 @@ class EDAService(AnalysisService):
 
         #9. Categorical Statistics 
         categorical_df = df.select_dtypes(
-            include=["object","str", "category","bool"]
+            include=["object", "category", "bool"]
         )
+
+
+        overview["numericColumnCount"] = int(numeric_df.shape[1])
+        overview["categoricalColumnCount"] = int(categorical_df.shape[1])
 
         categorical_statistics = {} 
 

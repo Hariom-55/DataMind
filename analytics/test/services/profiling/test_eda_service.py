@@ -30,6 +30,8 @@ class TestEDAService:
         assert result["overview"]["rowCount"] == 3
         assert result["overview"]["columnCount"] == 2
         assert result["columns"] == ["name", "age"]
+        assert result["overview"]["numericColumnCount"] == 1
+        assert result["overview"]["categoricalColumnCount"] == 1
 
     def test_should_return_correct_data_types(self, tmp_path):
 

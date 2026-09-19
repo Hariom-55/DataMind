@@ -242,7 +242,7 @@ class AnalysisJobWorkerTest
         verify(analysisJobService)
                 .failJob(
                         jobId,
-                        "Python Service did not return a completed result"
+                        "Python service did not return a completed result"
                 );
 
         verify(analysisExecutionService, never())

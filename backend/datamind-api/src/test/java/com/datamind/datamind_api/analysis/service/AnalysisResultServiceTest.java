@@ -29,9 +29,9 @@ class AnalysisResultServiceTest {
     @InjectMocks
     private AnalysisResultService analysisResultService;
 
+
     @Test
     void shouldSaveAnalysisResult() {
-
         Dataset dataset = mock(Dataset.class);
 
         AnalysisJob job = new AnalysisJob(
@@ -40,65 +40,84 @@ class AnalysisResultServiceTest {
                 AnalysisJobStatus.PROCESSING
         );
 
+        UUID jobId = job.getId();
+
         Map<String, Object> resultData = Map.of(
                 "rowCount", 100,
-                "columnCount", 5
+                "columnCount",
+                5
         );
 
         AnalysisResult savedResult = mock(AnalysisResult.class);
 
+        when(analysisResultRepository.findByJobId(jobId))
+                .thenReturn(Optional.empty());
+
         when(analysisResultRepository.save(any(AnalysisResult.class)))
                 .thenReturn(savedResult);
 
-        AnalysisResult result =
-                analysisResultService.saveResult(
-                        job,
-                        resultData
-                );
+        assertSame(savedResult, analysisResultService.saveResult(job, resultData));
 
-        assertSame(savedResult, result);
+        verify(analysisResultRepository)
+                .findByJobId(jobId);
 
         verify(analysisResultRepository)
                 .save(any(AnalysisResult.class));
     }
 
     @Test
-    void shouldGetResultByJobId() {
+    void shouldReturnExistingResultInsteadOfCreatingDuplicate() {
+        Dataset dataset = mock(Dataset.class);
+
+        AnalysisJob job = mock(AnalysisJob.class);
 
         UUID jobId = UUID.randomUUID();
 
-        AnalysisResult analysisResult =
-                mock(AnalysisResult.class);
+        AnalysisResult existingResult = mock(AnalysisResult.class);
+
+        when(job.getId())
+                .thenReturn(jobId);
+
+        when(analysisResultRepository.findByJobId(jobId))
+                .thenReturn(Optional.of(existingResult));
+
+        assertSame(existingResult,
+                analysisResultService.saveResult(
+                        job,
+                        Map.of("rows",
+                                100)
+                )
+        );
+
+        verify(analysisResultRepository, never()).save(any(AnalysisResult.class));
+    }
+
+    
+
+
+
+    @Test
+    void shouldGetResultByJobId() {
+        UUID jobId = UUID.randomUUID();
+
+        AnalysisResult analysisResult = mock(AnalysisResult.class);
 
         when(analysisResultRepository.findByJobId(jobId))
                 .thenReturn(Optional.of(analysisResult));
 
-        AnalysisResult result =
-                analysisResultService.getResultByJobId(jobId);
+        assertSame(analysisResult, analysisResultService.getResultByJobId(jobId));
 
-        assertSame(
-                analysisResult,
-                result
-        );
-
-        verify(analysisResultRepository)
-                .findByJobId(jobId);
+        verify(analysisResultRepository).findByJobId(jobId);
     }
 
     @Test
     void shouldThrowExceptionWhenResultNotFound() {
-
         UUID jobId = UUID.randomUUID();
-
-        when(analysisResultRepository.findByJobId(jobId))
-                .thenReturn(Optional.empty());
+        when(analysisResultRepository.findByJobId(jobId)).thenReturn(Optional.empty());
 
         assertThrows(
                 AnalysisResultNotFoundException.class,
                 () -> analysisResultService.getResultByJobId(jobId)
         );
-
-        verify(analysisResultRepository)
-                .findByJobId(jobId);
     }
 }

@@ -104,7 +104,7 @@ class AnalysisJobTest {
         job.markAsProcessing();
         job.markAsFailed("Temporary failure");
 
-        job.retry();
+        job.retry("Temporary failure");
 
         assertEquals(
                 AnalysisJobStatus.PENDING,
@@ -112,7 +112,7 @@ class AnalysisJobTest {
         );
 
         assertNull(job.getCompletedAt());
-        assertNull(job.getErrorMessage());
+        assertEquals("Temporary failure" ,job.getErrorMessage());
     }
 
     @Test
