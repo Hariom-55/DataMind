@@ -33,8 +33,9 @@ async function request(endpoint, options = {}) {
 
   if (!response.ok) {
     const message =
-      data?.error ||
       data?.message ||
+      data?.detail ||
+      data?.error ||
       `Request failed with status ${response.status}`;
 
     throw new Error(message);

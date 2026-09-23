@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 
+const EMPTY_INSIGHTS = Object.freeze([]);
+
 function InsightPanel({ result }) {
   const insights = result?.insights ?? {};
   const summary = insights.summary ?? {};
@@ -8,7 +10,7 @@ function InsightPanel({ result }) {
 
   const items = Array.isArray(insights.insights)
     ? insights.insights
-    : [];
+    : EMPTY_INSIGHTS;
 
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");

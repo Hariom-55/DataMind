@@ -7,9 +7,7 @@ import AnalysisResultView from "../components/analysis/AnalysisResultView";
 
 function AnalysisPage() {
   const [dataset, setDataset] = useState(null);
-  const [analysisType, setAnalysisType] = useState(
-    ANALYSIS_TYPES.INSIGHT,
-  );
+  const [analysisType, setAnalysisType] = useState(ANALYSIS_TYPES.INSIGHT);
   const [targetColumn, setTargetColumn] = useState("");
 
   const {
@@ -27,13 +25,12 @@ function AnalysisPage() {
   }
 
   async function handleRunAnalysis() {
-    if (!dataset?.id) {
-      return;
-    }
+    if (!dataset?.id) return;
 
     try {
       await startAnalysis({
         datasetId: dataset.id,
+        datasetVersionId: dataset.currentVersionId || dataset.versionId || null,
         analysisType,
         targetColumn: targetColumn || null,
       });
@@ -42,27 +39,17 @@ function AnalysisPage() {
     }
   }
 
-  const isRunning =
-    state === "STARTING" ||
-    state === "RUNNING";
-
-  const hasResult =
-    Boolean(result) &&
-    state === "RESULT_READY";
+  const isRunning = state === "STARTING" || state === "RUNNING";
+  const hasResult = Boolean(result) && state === "RESULT_READY";
 
   return (
     <main className="datamind-app">
       <header className="app-header">
         <div>
-          <div className="brand-mark">
-            DM
-          </div>
-
+          <div className="brand-mark">DM</div>
           <div>
             <h1>DataMind</h1>
-            <p>
-              Data Analysis & Intelligence Workspace
-            </p>
+            <p>Data Analysis & Intelligence Workspace</p>
           </div>
         </div>
 
@@ -78,43 +65,29 @@ function AnalysisPage() {
         {!dataset ? (
           <section className="upload-workspace">
             <div className="workspace-intro">
-              <span className="eyebrow">
-                ANALYTICS WORKSPACE
-              </span>
-
+              <span className="eyebrow">ANALYTICS WORKSPACE</span>
               <h2>
                 Turn your dataset into
                 <br />
                 actionable intelligence.
               </h2>
-
               <p>
-                Upload a dataset to begin exploratory
-                analysis, statistical profiling and
-                automated insights.
+                Upload a dataset to begin exploratory analysis,
+                statistical profiling and automated insights.
               </p>
             </div>
-
-            <DatasetUpload
-              onUploadSuccess={handleUploadSuccess}
-            />
+            <DatasetUpload onUploadSuccess={handleUploadSuccess} />
           </section>
         ) : (
           <>
             <section className="workspace-toolbar">
               <div className="dataset-context">
-                <div className="dataset-icon">
-                  CSV
-                </div>
-
+                <div className="dataset-icon">CSV</div>
                 <div>
-                  <span className="eyebrow">
-                    ACTIVE DATASET
-                  </span>
-
+                  <span className="eyebrow">ACTIVE DATASET</span>
                   <h2>{dataset.name}</h2>
-
                   <p>
+                    v{dataset.versionNumber ?? "1"} ·{" "}
                     {dataset.fileType || "Dataset"} ·{" "}
                     {dataset.status}
                   </p>
@@ -136,15 +109,11 @@ function AnalysisPage() {
             <section className="analysis-control-card">
               <div className="section-heading">
                 <div>
-                  <span className="eyebrow">
-                    ANALYSIS
-                  </span>
-
+                  <span className="eyebrow">ANALYSIS</span>
                   <h2>Configure analysis</h2>
-
                   <p>
-                    Select the analytical workflow you want
-                    DataMind to execute.
+                    Select the analytical workflow and run it against an explicit
+                    immutable dataset version.
                   </p>
                 </div>
 
@@ -158,47 +127,32 @@ function AnalysisPage() {
 
               <div className="analysis-form">
                 <div className="field">
-                  <label htmlFor="analysis-type">
-                    Analysis type
-                  </label>
-
+                  <label htmlFor="analysis-type">Analysis type</label>
                   <select
                     id="analysis-type"
                     value={analysisType}
-                    onChange={(event) =>
-                      setAnalysisType(event.target.value)
-                    }
+                    onChange={(event) => setAnalysisType(event.target.value)}
                     disabled={isRunning}
                   >
-                    {Object.values(ANALYSIS_TYPES).map(
-                      (type) => (
-                        <option
-                          key={type}
-                          value={type}
-                        >
-                          {type.replaceAll("_", " ")}
-                        </option>
-                      ),
-                    )}
+                    {Object.values(ANALYSIS_TYPES).map((type) => (
+                      <option key={type} value={type}>
+                        {type.replaceAll("_", " ")}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
-                {analysisType ===
-                  ANALYSIS_TYPES.MACHINE_LEARNING && (
+                {analysisType === ANALYSIS_TYPES.MACHINE_LEARNING && (
                   <div className="field">
-                    <label htmlFor="target-column">
-                      Target column
-                    </label>
-
+                    <label htmlFor="target-column">Target column</label>
                     <input
                       id="target-column"
                       value={targetColumn}
-                      onChange={(event) =>
-                        setTargetColumn(event.target.value)
-                      }
+                      onChange={(event) => setTargetColumn(event.target.value)}
                       placeholder="e.g. target"
                       disabled={isRunning}
                     />
+                    <small>Leave blank to run KMeans clustering with numeric features.</small>
                   </div>
                 )}
 
@@ -209,9 +163,7 @@ function AnalysisPage() {
                     onClick={handleRunAnalysis}
                     disabled={isRunning}
                   >
-                    {isRunning
-                      ? "Running analysis..."
-                      : "Run analysis"}
+                    {isRunning ? "Running analysis..." : "Run analysis"}
                   </button>
                 </div>
               </div>
@@ -223,7 +175,6 @@ function AnalysisPage() {
                   <div
                     className={`status-indicator status-${state.toLowerCase()}`}
                   />
-
                   <div>
                     <strong>
                       {state === "RESULT_READY"
@@ -234,22 +185,22 @@ function AnalysisPage() {
                             ? "Analysis timed out"
                             : "Analysis in progress"}
                     </strong>
-
                     <span>
                       {state === "RESULT_READY"
-                        ? "Your analytical results are ready."
+                        ? `Dataset version v${job?.datasetVersion ?? dataset.versionNumber ?? "1"}`
                         : isRunning
                           ? "DataMind is processing your dataset."
-                          : error?.message ||
-                            "Analysis status updated."}
+                          : error?.message || "Analysis status updated."}
                     </span>
                   </div>
                 </div>
 
                 {job?.id && (
                   <div className="job-meta">
-                    <span>Job ID</span>
-                    <code>{job.id}</code>
+                    <span>JOB / VERSION</span>
+                    <code>
+                      {job.id} · v{job.datasetVersion ?? dataset.versionNumber ?? "1"}
+                    </code>
                   </div>
                 )}
               </section>
@@ -265,6 +216,7 @@ function AnalysisPage() {
             {hasResult && (
               <AnalysisResultView
                 result={result}
+                analysisType={job?.analysisType || analysisType}
               />
             )}
           </>

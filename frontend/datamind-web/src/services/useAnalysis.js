@@ -1,19 +1,16 @@
 import { useState } from "react";
-
 import { runAnalysis } from "./analysisService";
 import { ANALYSIS_STATE } from "./analysisState";
 
 function useAnalysis() {
-  const [state, setState] = useState(
-    ANALYSIS_STATE.IDLE,
-  );
-
+  const [state, setState] = useState(ANALYSIS_STATE.IDLE);
   const [job, setJob] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
   async function startAnalysis({
     datasetId,
+    datasetVersionId = null,
     analysisType,
     targetColumn = null,
     options = {},
@@ -28,17 +25,14 @@ function useAnalysis() {
 
       const analysisResponse = await runAnalysis({
         datasetId,
+        datasetVersionId,
         analysisType,
         targetColumn,
         options,
       });
 
       setJob(analysisResponse.job);
-
-      setState(ANALYSIS_STATE.COMPLETED);
-
       setResult(analysisResponse.result);
-
       setState(ANALYSIS_STATE.RESULT_READY);
 
       return analysisResponse;
@@ -49,7 +43,6 @@ function useAnalysis() {
           ? ANALYSIS_STATE.TIMEOUT
           : ANALYSIS_STATE.FAILED,
       );
-
       throw analysisError;
     }
   }

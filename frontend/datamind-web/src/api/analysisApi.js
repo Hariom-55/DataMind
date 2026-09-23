@@ -2,6 +2,7 @@ import { request } from "./client";
 
 async function createAnalysisJob({
   datasetId,
+  datasetVersionId = null,
   analysisType,
   targetColumn = null,
 }) {
@@ -9,6 +10,7 @@ async function createAnalysisJob({
     method: "POST",
     body: JSON.stringify({
       datasetId,
+      datasetVersionId,
       analysisType,
       targetColumn,
     }),
@@ -16,19 +18,11 @@ async function createAnalysisJob({
 }
 
 async function getAnalysisJob(jobId) {
-  return request(`/api/analysis/jobs/${jobId}`, {
-    method: "GET",
-  });
+  return request(`/api/analysis/jobs/${jobId}`, { method: "GET" });
 }
 
 async function getAnalysisResult(jobId) {
-  return request(`/api/analysis/jobs/${jobId}/result`, {
-    method: "GET",
-  });
+  return request(`/api/analysis/jobs/${jobId}/result`, { method: "GET" });
 }
 
-export {
-  createAnalysisJob,
-  getAnalysisJob,
-  getAnalysisResult,
-};
+export { createAnalysisJob, getAnalysisJob, getAnalysisResult };

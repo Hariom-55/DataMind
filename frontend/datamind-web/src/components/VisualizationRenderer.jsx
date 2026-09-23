@@ -1,41 +1,106 @@
 import BarVisualization from "./visualizations/BarVisualization";
 import HeatmapVisualization from "./visualizations/HeatmapVisualization";
 import TableVisualization from "./visualizations/TableVisualization";
+import { ResponsiveContainer, LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
 
-function VisualizationRenderer({ visualization }) {
-  if (!visualization) {
-    return null;
+function GenericChart({ visualization }) {
+  const data = Array.isArray(visualization?.data) ? visualization.data : [];
+  const x = visualization?.x || Object.keys(data[0] || {})[0];
+  const y = visualization?.y || Object.keys(data[0] || {})[1];
+
+  if (!data.length) {
+    return (
+      <div className="empty-state">
+        <strong>No chart data</strong>
+        <span>The visualization specification did not contain renderable rows.</span>
+      </div>
+    );
   }
 
   switch (visualization.type) {
+    case "LINE":
+      return (
+        <div className="chart-container">
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey={x} />
+              <YAxis />
+              <Tooltip />
+              <Line type="monotone" dataKey={y} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      );
+    case "SCATTER":
+      return (
+        <div className="chart-container">
+          <ResponsiveContainer width="100%" height={320}>
+            <ScatterChart>
+              <CartesianGrid />
+              <XAxis dataKey={x} name={x} />
+              <YAxis dataKey={y} name={y} />
+              <Tooltip cursor={{ strokeDasharray: "3 3" }} />
+              <Scatter data={data} />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </div>
+      );
+    case "HISTOGRAM":
+      return (
+        <div className="chart-container">
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey={x} />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey={y} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      );
+    case "PIE":
+      return (
+        <div className="chart-container">
+          <ResponsiveContainer width="100%" height={320}>
+            <PieChart>
+              <Pie data={data} dataKey={y} nameKey={x} outerRadius={110} label>
+                {data.map((entry, index) => <Cell key={`${entry[x]}-${index}`} />)}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      );
+    case "BOX_PLOT":
+      return <TableVisualization visualization={visualization} />;
+    default:
+      return null;
+  }
+}
+
+function VisualizationRenderer({ visualization }) {
+  if (!visualization) return null;
+
+  switch (visualization.type) {
     case "BAR":
-      return (
-        <BarVisualization
-          visualization={visualization}
-        />
-      );
-
+      return <BarVisualization visualization={visualization} />;
     case "HEATMAP":
-      return (
-        <HeatmapVisualization
-          visualization={visualization}
-        />
-      );
-
+      return <HeatmapVisualization visualization={visualization} />;
     case "TABLE":
-      return (
-        <TableVisualization
-          visualization={visualization}
-        />
-      );
-
+      return <TableVisualization visualization={visualization} />;
+    case "LINE":
+    case "SCATTER":
+    case "HISTOGRAM":
+    case "PIE":
+    case "BOX_PLOT":
+      return <GenericChart visualization={visualization} />;
     default:
       return (
         <div className="visualization-not-supported">
           <p>
-            Visualization type{" "}
-            <strong>{visualization.type}</strong>{" "}
-            is not supported yet.
+            Visualization type <strong>{visualization.type}</strong> is not supported by the current renderer.
           </p>
         </div>
       );

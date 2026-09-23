@@ -2,13 +2,15 @@ import { useMemo, useState } from "react";
 
 import VisualizationRenderer from "./VisualizationRenderer";
 
+const EMPTY_VISUALIZATIONS = Object.freeze([]);
+
 function VisualizationPanel({ result }) {
   const visualizations =
     Array.isArray(result?.visualizations?.visualizations)
       ? result.visualizations.visualizations
       : Array.isArray(result?.visualizations)
         ? result.visualizations
-        : [];
+        : EMPTY_VISUALIZATIONS;
 
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");

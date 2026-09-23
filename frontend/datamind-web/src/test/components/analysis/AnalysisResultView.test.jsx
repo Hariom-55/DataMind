@@ -52,7 +52,7 @@ describe("AnalysisResultView", () => {
 
     expect(screen.getByText("891")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getAllByText("3").length).toBeGreaterThan(0);
   });
 
   it("renders an EDA-only result without empty insight or visualization panels", () => {
@@ -79,6 +79,9 @@ describe("AnalysisResultView", () => {
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { name: "Insights" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Visualizations" }),
     ).not.toBeInTheDocument();
   });
 

@@ -5,13 +5,12 @@ import {
 } from "../api/analysisApi";
 
 import { ANALYSIS_JOB_STATUS } from "../api/analysisType";
+
 const DEFAULT_POLL_INTERVAL = 1000;
 const DEFAULT_TIMEOUT = 120000;
 
 function wait(milliseconds) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, milliseconds);
-  });
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 async function waitForAnalysisJob(
@@ -26,14 +25,10 @@ async function waitForAnalysisJob(
   while (true) {
     const job = await getAnalysisJob(jobId);
 
-    if (job.status === ANALYSIS_JOB_STATUS.COMPLETED) {
-      return job;
-    }
+    if (job.status === ANALYSIS_JOB_STATUS.COMPLETED) return job;
 
     if (job.status === ANALYSIS_JOB_STATUS.FAILED) {
-      throw new Error(
-        job.errorMessage || "Analysis job failed",
-      );
+      throw new Error(job.errorMessage || "Analysis job failed");
     }
 
     if (Date.now() - startTime >= timeout) {
@@ -46,32 +41,22 @@ async function waitForAnalysisJob(
 
 async function runAnalysis({
   datasetId,
+  datasetVersionId = null,
   analysisType,
   targetColumn = null,
   options = {},
 }) {
   const job = await createAnalysisJob({
     datasetId,
+    datasetVersionId,
     analysisType,
     targetColumn,
   });
 
-  const completedJob = await waitForAnalysisJob(
-    job.id,
-    options,
-  );
+  const completedJob = await waitForAnalysisJob(job.id, options);
+  const result = await getAnalysisResult(completedJob.id);
 
-  const result = await getAnalysisResult(
-    completedJob.id,
-  );
-
-  return {
-    job: completedJob,
-    result,
-  };
+  return { job: completedJob, result };
 }
 
-export {
-  runAnalysis,
-  waitForAnalysisJob,
-};
+export { runAnalysis, waitForAnalysisJob };

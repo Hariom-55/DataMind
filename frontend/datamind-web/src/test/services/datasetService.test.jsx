@@ -26,6 +26,17 @@ describe("datasetService", () => {
     expect(result).toEqual(dataset);
   });
 
+  it("passes an existing logical dataset ID when adding a version", async () => {
+    const file = new File(["name,age\nJohn,22"], "users.csv", {
+      type: "text/csv",
+    });
+    uploadDataset.mockResolvedValue({ id: "dataset-123", versionNumber: 2 });
+
+    await uploadDatasetFile(file, "dataset-123");
+
+    expect(uploadDataset).toHaveBeenCalledWith(file, "dataset-123");
+  });
+
   it("rejects when file is missing", async () => {
     await expect(uploadDatasetFile(null)).rejects.toThrow(
       "A valid file is required.",
