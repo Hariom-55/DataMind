@@ -18,6 +18,10 @@ class MLVisualizationGenerator(VisualizationGenerator):
             "problemType"
         )
 
+        training = analysis_results.get("training", {})
+        if not isinstance(training, dict):
+            return visualizations
+
         if problem_type == "CLASSIFICATION":
             visualizations.extend(
                 self._generate_class_distribution(
@@ -25,13 +29,8 @@ class MLVisualizationGenerator(VisualizationGenerator):
                 )
             )
 
-        training = analysis_results.get(
-            "training",
-            {}
-        )
-
-        if not isinstance(training, dict):
-            return visualizations
+        if problem_type == "CLUSTERING":
+            visualizations.extend(self._generate_cluster_visualizations(analysis_results))
 
         visualizations.extend(
             self._generate_model_comparison(
@@ -51,6 +50,39 @@ class MLVisualizationGenerator(VisualizationGenerator):
                 training
             )
         )
+
+        return visualizations
+
+    def _generate_cluster_visualizations(self, analysis_results: dict) -> list[dict]:
+        training = analysis_results.get("training", {})
+        distribution = training.get("clusterDistribution", {})
+        visualizations = []
+
+        if distribution:
+            visualizations.append(VisualizationSpec(
+                type=VisualizationType.BAR,
+                title="Cluster Sizes",
+                description="Number of rows assigned to each KMeans cluster.",
+                x="cluster",
+                y="count",
+                data=[
+                    {"cluster": label, "count": int(count)}
+                    for label, count in distribution.items()
+                ],
+                metadata={"source": "MACHINE_LEARNING", "metric": "clusterDistribution"},
+            ).to_dict())
+
+        coordinates = training.get("pca", {}).get("coordinates", [])
+        if coordinates and all("PC2" in row for row in coordinates):
+            visualizations.append(VisualizationSpec(
+                type=VisualizationType.SCATTER,
+                title="PCA Cluster Projection",
+                description="Two-component PCA projection of the standardized numeric features.",
+                x="PC1",
+                y="PC2",
+                data=coordinates,
+                metadata={"source": "MACHINE_LEARNING", "metric": "pcaProjection"},
+            ).to_dict())
 
         return visualizations
 

@@ -134,6 +134,49 @@ class TestEDAService:
         assert statistics["max"] == pytest.approx(60.0)
         assert statistics["50%"] == pytest.approx(40.0)
 
+    def test_should_flag_iqr_outliers_when_quartiles_are_equal(self, tmp_path):
+        dataset = pd.DataFrame({"constant_with_spike": [5, 5, 5, 5, 100]})
+        file_path = tmp_path / "zero_iqr_outlier.csv"
+        dataset.to_csv(file_path, index=False)
+
+        result = self.service.analyze(str(file_path))
+
+        signal = result["outlierSignals"]["constant_with_spike"]
+        assert signal["lowerBound"] == 5.0
+        assert signal["upperBound"] == 5.0
+        assert signal["outlierCount"] == 1
+
+    def test_should_identify_singleton_rare_categories(self, tmp_path):
+        dataset = pd.DataFrame({"category": ["common", "common", "other", "rare"]})
+        file_path = tmp_path / "rare_categories.csv"
+        dataset.to_csv(file_path, index=False)
+
+        result = self.service.analyze(str(file_path))
+
+        assert result["categoricalStatistics"]["category"]["rareValues"] == {
+            "other": 1,
+            "rare": 1,
+        }
+
+    def test_should_report_constant_and_high_cardinality_columns(self, tmp_path):
+        dataset = pd.DataFrame({
+            "constant": ["same"] * 40,
+            "identifier": [f"id-{index}" for index in range(40)],
+            "value": list(range(40)),
+        })
+        file_path = tmp_path / "quality_signals.csv"
+        dataset.to_csv(file_path, index=False)
+
+        result = self.service.analyze(str(file_path))
+
+        assert result["dataQuality"]["constantColumns"] == ["constant"]
+        assert result["dataQuality"]["highCardinalityThreshold"] == 0.5
+        assert result["dataQuality"]["highCardinalityColumns"] == [{
+            "column": "identifier",
+            "uniqueCount": 40,
+            "cardinalityRatio": 1.0,
+        }]
+
     def test_should_generate_categorical_statistics(self, tmp_path):
 
         dataset = pd.DataFrame({

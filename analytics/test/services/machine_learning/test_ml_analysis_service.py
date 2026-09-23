@@ -10,15 +10,30 @@ class TestMLAnalysisService:
         dataset_loader = DatasetLoader()
         self.service = MLAnalysisService(dataset_loader)  
 
-    def test_should_require_target_column(self):
+    def test_should_run_unsupervised_clustering_without_a_target(self, tmp_path):
+        dataset_path = tmp_path / "segments.csv"
+        pd.DataFrame({
+            "visits": [1, 2, 3, 10, 11, 12],
+            "spend": [2, 3, 2, 20, 21, 19],
+            "segment_name": ["low"] * 3 + ["high"] * 3,
+        }).to_csv(dataset_path, index=False)
 
-        with pytest.raises(
-            ValueError,
-            match="Target column is required"
-        ):
-            self.service.analyze(
-                "path/to/dataset.csv"
-            )
+        result = self.service.analyze(str(dataset_path), "text/csv")
+
+        assert result["problemType"] == "CLUSTERING"
+        assert result["training"]["model"] == "KMeans"
+        assert result["training"]["clusterCount"] >= 2
+        assert sum(result["training"]["clusterDistribution"].values()) == 6
+        assert -1 <= result["training"]["metrics"]["silhouetteScore"] <= 1
+        assert len(result["training"]["pca"]["coordinates"]) == 6
+        assert "segment_name" in result["excludedNonNumericColumns"]
+
+    def test_clustering_rejects_data_without_numeric_features(self, tmp_path):
+        dataset_path = tmp_path / "labels.csv"
+        pd.DataFrame({"label": ["a", "b", "a"]}).to_csv(dataset_path, index=False)
+
+        with pytest.raises(ValueError, match="at least one numeric feature"):
+            self.service.analyze(str(dataset_path), "text/csv")
 
     def test_should_reject_empty_dataset(self, tmp_path):
 
@@ -894,4 +909,4 @@ class TestMLAnalysisService:
 
             
 
-                
+

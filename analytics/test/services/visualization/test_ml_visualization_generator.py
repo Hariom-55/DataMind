@@ -12,6 +12,22 @@ class TestMLVisualizationGenerator:
     def setup_method(self):
         self.generator = MLVisualizationGenerator()
 
+    def test_should_visualize_clustering_and_pca_results(self):
+        result = self.generator.generate({
+            "problemType": "CLUSTERING",
+            "training": {
+                "clusterDistribution": {"0": 2, "1": 3},
+                "pca": {"coordinates": [
+                    {"row": 0, "cluster": 0, "PC1": 1.0, "PC2": 0.5},
+                    {"row": 1, "cluster": 1, "PC1": -1.0, "PC2": -0.5},
+                ]},
+            },
+        })
+
+        assert [item["type"] for item in result] == ["BAR", "SCATTER"]
+        assert result[1]["x"] == "PC1"
+        assert result[1]["y"] == "PC2"
+
     def test_should_generate_classification_visualizations(self):
         analysis_results = {
             "targetColumn": "churn",

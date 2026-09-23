@@ -4,8 +4,8 @@ from app.services.visualization.ml_visualization_generator import MLVisualizatio
 from app.services.visualization.statistical_visualization_generator import StatisticalVisualizationGenerator
 
 
-
 class VisualizationOrchestrationService:
+    CONTRACT_VERSION = "v1"
 
     def __init__(
         self,
@@ -14,82 +14,29 @@ class VisualizationOrchestrationService:
         distribution_generator: DistributionVisualizationGenerator | None = None,
         ml_generator: MLVisualizationGenerator | None = None,
     ):
-        self.eda_generator = (
-            eda_generator
-            if eda_generator is not None
-            else EDAVisualizationGenerator()
-        )
+        self.eda_generator = eda_generator or EDAVisualizationGenerator()
+        self.statistical_generator = statistical_generator or StatisticalVisualizationGenerator()
+        self.distribution_generator = distribution_generator or DistributionVisualizationGenerator()
+        self.ml_generator = ml_generator or MLVisualizationGenerator()
 
-        self.statistical_generator = (
-            statistical_generator
-            if statistical_generator is not None
-            else StatisticalVisualizationGenerator()
-        )
-
-        self.distribution_generator = (
-            distribution_generator
-            if distribution_generator is not None
-            else DistributionVisualizationGenerator()
-        )
-
-        self.ml_generator = (
-            ml_generator
-            if ml_generator is not None
-            else MLVisualizationGenerator()
-        )
-
-    def generate(
-        self,
-        analysis_results: dict
-    ) -> dict:
-
+    def generate(self, analysis_results: dict) -> dict:
         if not isinstance(analysis_results, dict):
-            raise ValueError(
-                "analysis_results must be a dictionary"
-            )
+            raise ValueError("analysis_results must be a dictionary")
 
         visualizations = []
 
-        # EDA visualizations
         eda_results = analysis_results.get("eda")
-
         if eda_results is not None:
-            visualizations.extend(
-                self.eda_generator.generate(
-                    eda_results
-                )
-            )
+            visualizations.extend(self.eda_generator.generate(eda_results))
 
-        # Statistical + Distribution visualizations
-        statistical_results = analysis_results.get(
-            "statistical"
-        )
-
+        statistical_results = analysis_results.get("statistical")
         if statistical_results is not None:
+            visualizations.extend(self.statistical_generator.generate(statistical_results))
+            visualizations.extend(self.distribution_generator.generate(statistical_results))
 
-            visualizations.extend(
-                self.statistical_generator.generate(
-                    statistical_results
-                )
-            )
-
-            visualizations.extend(
-                self.distribution_generator.generate(
-                    statistical_results
-                )
-            )
-
-        # Machine Learning visualizations
-        ml_results = analysis_results.get(
-            "machineLearning"
-        )
-
+        ml_results = analysis_results.get("machineLearning")
         if ml_results is not None:
-            visualizations.extend(
-                self.ml_generator.generate(
-                    ml_results
-                )
-            )
+            visualizations.extend(self.ml_generator.generate(ml_results))
 
         return {
             "visualizations": visualizations

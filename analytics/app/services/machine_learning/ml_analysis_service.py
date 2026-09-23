@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 from app.core.analysis_service import AnalysisService
@@ -27,10 +28,84 @@ from sklearn.model_selection import (
 
 
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 class MLAnalysisService(AnalysisService):
+
+    def _cluster_dataset(self, df: pd.DataFrame) -> dict:
+        numeric = df.select_dtypes(include=["number"]).replace(
+            [np.inf, -np.inf], np.nan
+        )
+        numeric = numeric.dropna(axis=1, how="all")
+
+        if numeric.shape[1] == 0:
+            raise ValueError("Clustering requires at least one numeric feature column")
+        if len(numeric) < 2:
+            raise ValueError("Clustering requires at least two dataset rows")
+
+        imputed = SimpleImputer(strategy="median").fit_transform(numeric)
+        scaled = StandardScaler().fit_transform(imputed)
+
+        distinct_rows = np.unique(scaled, axis=0).shape[0]
+        cluster_count = min(3, distinct_rows)
+        model = KMeans(n_clusters=cluster_count, random_state=42, n_init=10)
+        labels = model.fit_predict(scaled)
+        actual_clusters = np.unique(labels)
+
+        metrics = {"inertia": round(float(model.inertia_), 6)}
+        if 1 < len(actual_clusters) < len(scaled):
+            metrics["silhouetteScore"] = round(
+                float(silhouette_score(scaled, labels)), 4
+            )
+
+        component_count = min(2, scaled.shape[1], scaled.shape[0])
+        pca = PCA(n_components=component_count, random_state=42)
+        coordinates = pca.fit_transform(scaled)
+        pca_rows = []
+        for row_index, point in enumerate(coordinates):
+            row = {
+                "row": int(row_index),
+                "cluster": int(labels[row_index]),
+                "PC1": round(float(point[0]), 6),
+            }
+            if component_count > 1:
+                row["PC2"] = round(float(point[1]), 6)
+            pca_rows.append(row)
+
+        return {
+            "targetColumn": None,
+            "rowCount": int(len(df)),
+            "columnCount": int(len(df.columns)),
+            "featureCount": int(numeric.shape[1]),
+            "featureColumns": list(numeric.columns),
+            "excludedNonNumericColumns": [
+                column for column in df.columns if column not in numeric.columns
+            ],
+            "problemType": "CLUSTERING",
+            "training": {
+                "model": "KMeans",
+                "metrics": metrics,
+                "clusterCount": int(len(actual_clusters)),
+                "clusterDistribution": {
+                    str(int(label)): int(np.count_nonzero(labels == label))
+                    for label in actual_clusters
+                },
+                "pca": {
+                    "componentCount": int(component_count),
+                    "explainedVarianceRatio": [
+                        round(float(value), 6)
+                        for value in np.nan_to_num(
+                            pca.explained_variance_ratio_, nan=0.0, posinf=0.0, neginf=0.0
+                        )
+                    ],
+                    "coordinates": pca_rows,
+                },
+            },
+        }
 
     def _detect_problem_type(
             self,
@@ -793,11 +868,6 @@ class MLAnalysisService(AnalysisService):
             target_column: str | None = None
     ) -> dict :
 
-        if not target_column:
-            raise ValueError(
-                "Target column is required for machine learning analysis." 
-                )
-
         df = self.dataset_loader.load(
             dataset_path,
             file_type
@@ -807,6 +877,11 @@ class MLAnalysisService(AnalysisService):
             raise ValueError(
                 "Dataset cannot be empty"
             )
+
+        # A blank target selects the unsupervised V1 workflow. Supplying a
+        # target retains automatic regression/classification detection.
+        if not target_column:
+            return self._cluster_dataset(df)
 
         if target_column not in df.columns:
             raise ValueError(

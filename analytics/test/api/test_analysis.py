@@ -45,6 +45,32 @@ class TestAnalysisAPI:
 
         assert body["result"]["overview"]["rowCount"] == 3
         assert body["result"]["overview"]["columnCount"] == 2
+        assert body["result"]["visualizations"]
+
+    def test_should_return_cluster_and_pca_results_for_targetless_ml(self, tmp_path):
+        dataset = pd.DataFrame({
+            "visits": [1, 2, 3, 10, 11, 12],
+            "spend": [2, 3, 2, 20, 21, 19],
+        })
+        file_path = tmp_path / "segments.csv"
+        dataset.to_csv(file_path, index=False)
+
+        response = client.post(
+            "/internal/analyze",
+            json={
+                "jobId": TEST_JOB_ID,
+                "datasetId": TEST_DATASET_ID,
+                "analysisType": "MACHINE_LEARNING",
+                "datasetPath": str(file_path),
+            },
+        )
+
+        assert response.status_code == 200
+        result = response.json()["result"]
+        assert result["problemType"] == "CLUSTERING"
+        assert result["training"]["model"] == "KMeans"
+        assert len(result["training"]["pca"]["coordinates"]) == 6
+        assert result["visualizations"]
 
 
     def test_should_run_statistical_analysis(self, tmp_path):

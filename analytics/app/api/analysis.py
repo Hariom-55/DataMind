@@ -96,6 +96,18 @@ def analyze(request: AnalysisRequest):
             request.targetColumn
         )
 
+        # Individual analysis services return domain results directly. Add
+        # visualization specs here so the specialized dashboards receive the
+        # same renderable contract as INSIGHT analysis.
+        visualization_key = {
+            "EDA": "eda",
+            "STATISTICAL": "statistical",
+            "MACHINE_LEARNING": "machineLearning",
+        }.get(request.analysisType.value)
+        if visualization_key and isinstance(result, dict):
+            generated = visualization_service.generate({visualization_key: result})
+            result = {**result, "visualizations": generated["visualizations"]}
+
     except ValueError as ex:
         raise HTTPException(
             status_code=400,
