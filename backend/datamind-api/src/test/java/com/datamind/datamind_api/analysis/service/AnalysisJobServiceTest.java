@@ -78,23 +78,22 @@ class AnalysisJobServiceTest {
     }
 
     @Test
-    void shouldRejectMachineLearningWithoutTargetColumn() {
+    void shouldCreateUnsupervisedMachineLearningJobWithoutTargetColumn() {
         UUID datasetId = UUID.randomUUID();
         Dataset dataset = mock(Dataset.class);
         when(datasetService.getDatasetById(datasetId)).thenReturn(dataset);
+        when(dataset.getLogicalDatasetId()).thenReturn(datasetId);
+        when(dataset.getId()).thenReturn(datasetId);
+        when(datasetService.getCurrentVersion(datasetId)).thenReturn(dataset);
+        when(analysisJobRepository.save(any(AnalysisJob.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> analysisJobService.createAnalysisJob(
-                        datasetId, AnalysisType.MACHINE_LEARNING, "  "
-                )
+        AnalysisJob result = analysisJobService.createAnalysisJob(
+                datasetId, AnalysisType.MACHINE_LEARNING, "  "
         );
 
-        assertEquals(
-                "targetColumn is required for MACHINE_LEARNING analysis",
-                exception.getMessage()
-        );
-        verify(analysisJobRepository, never()).save(any());
+        assertNull(result.getTargetColumn());
+        verify(analysisJobRepository).save(any(AnalysisJob.class));
     }
 
     @Test
@@ -136,6 +135,8 @@ class AnalysisJobServiceTest {
     @Test
     void shouldClaimNextPendingJob() {
         AnalysisJob job = mock(AnalysisJob.class);
+        Dataset version = mock(Dataset.class);
+        when(job.getDatasetVersion()).thenReturn(version);
         when(analysisJobRepository.findNextPendingJob(AnalysisJobStatus.PENDING.name()))
                 .thenReturn(Optional.of(job));
 

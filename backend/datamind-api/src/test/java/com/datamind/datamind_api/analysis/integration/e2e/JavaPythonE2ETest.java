@@ -106,7 +106,7 @@ class JavaPythonE2ETest
             UUID jobId = job.getId();
 
             // Act
-            analysisJobWorker.processPendingJob();
+            processJobsUntilTerminal(jobId);
 
             // Assert
             AnalysisJob completedJob =
@@ -385,7 +385,7 @@ class JavaPythonE2ETest
             UUID jobId = job.getId();
 
             // Act
-            analysisJobWorker.processPendingJob();
+            processJobsUntilTerminal(jobId);
 
             // Assert
             AnalysisJob completedJob =
@@ -771,6 +771,158 @@ class JavaPythonE2ETest
     }
 
     @Test
+    void shouldCompleteTargetFreeClusteringJobThroughPython() throws Exception
+    {
+        Path datasetPath = Files.createTempFile("datamind-clustering-e2e-", ".csv");
+        try
+        {
+            Files.writeString(datasetPath, """
+                    visits,spend
+                    1,2
+                    2,3
+                    3,2
+                    10,20
+                    11,21
+                    12,19
+                    """);
+            AnalysisJob job = createMachineLearningJob(datasetPath, null);
+
+            processJobsUntilTerminal(job.getId());
+
+            AnalysisJob completedJob = analysisJobRepository.findById(job.getId()).orElseThrow();
+            assertEquals(AnalysisJobStatus.COMPLETED, completedJob.getStatus());
+
+            Map<String, Object> result = analysisResultRepository.findByJobId(job.getId())
+                    .orElseThrow().getResultData();
+            assertEquals("CLUSTERING", result.get("problemType"));
+            Map<String, Object> training = (Map<String, Object>) result.get("training");
+            assertEquals("KMeans", training.get("model"));
+            assertEquals(6, ((java.util.List<?>) ((Map<String, Object>) training.get("pca"))
+                    .get("coordinates")).size());
+            assertTrue(((java.util.List<?>) result.get("visualizations")).size() > 0);
+        }
+        finally
+        {
+            Files.deleteIfExists(datasetPath);
+        }
+    }
+
+    @Test
+    void shouldCompleteSupervisedRegressionJobThroughPython() throws Exception
+    {
+        Path datasetPath = Files.createTempFile("datamind-regression-e2e-", ".csv");
+        try
+        {
+            Files.writeString(datasetPath, """
+                    feature_a,feature_b,revenue
+                    1,2,5
+                    2,1,7
+                    3,4,13
+                    4,2,14
+                    5,3,19
+                    6,5,23
+                    7,4,25
+                    8,7,31
+                    9,6,33
+                    10,8,38
+                    11,9,43
+                    12,7,43
+                    """);
+            AnalysisJob job = createMachineLearningJob(datasetPath, "revenue");
+
+            processJobsUntilTerminal(job.getId());
+
+            AnalysisJob completedJob = analysisJobRepository.findById(job.getId()).orElseThrow();
+            assertEquals(AnalysisJobStatus.COMPLETED, completedJob.getStatus());
+
+            Map<String, Object> result = analysisResultRepository.findByJobId(job.getId())
+                    .orElseThrow().getResultData();
+            assertEquals("REGRESSION", result.get("problemType"));
+            assertEquals("revenue", result.get("targetColumn"));
+            Map<String, Object> training = (Map<String, Object>) result.get("training");
+            assertNotNull(training.get("metrics"));
+            assertNotNull(training.get("model"));
+            assertTrue(((java.util.List<?>) result.get("visualizations")).size() > 0);
+        }
+        finally
+        {
+            Files.deleteIfExists(datasetPath);
+        }
+    }
+
+    @Test
+    void shouldCompleteSupervisedClassificationJobThroughPython() throws Exception
+    {
+        Path datasetPath = Files.createTempFile("datamind-classification-e2e-", ".csv");
+        try
+        {
+            Files.writeString(datasetPath, """
+                    feature,label
+                    1,low
+                    2,low
+                    3,low
+                    4,low
+                    5,low
+                    6,low
+                    7,low
+                    8,low
+                    9,low
+                    10,low
+                    11,high
+                    12,high
+                    13,high
+                    14,high
+                    15,high
+                    16,high
+                    17,high
+                    18,high
+                    19,high
+                    20,high
+                    """);
+            AnalysisJob job = createMachineLearningJob(datasetPath, "label");
+
+            processJobsUntilTerminal(job.getId());
+
+            AnalysisJob completedJob = analysisJobRepository.findById(job.getId()).orElseThrow();
+            assertEquals(AnalysisJobStatus.COMPLETED, completedJob.getStatus());
+
+            Map<String, Object> result = analysisResultRepository.findByJobId(job.getId())
+                    .orElseThrow().getResultData();
+            assertEquals("CLASSIFICATION", result.get("problemType"));
+            assertEquals("label", result.get("targetColumn"));
+            Map<String, Object> training = (Map<String, Object>) result.get("training");
+            assertNotNull(training.get("metrics"));
+            assertNotNull(training.get("model"));
+            assertTrue(((java.util.List<?>) result.get("visualizations")).size() > 0);
+        }
+        finally
+        {
+            Files.deleteIfExists(datasetPath);
+        }
+    }
+
+    private AnalysisJob createMachineLearningJob(Path datasetPath, String targetColumn)
+            throws Exception
+    {
+        Dataset dataset = new Dataset(
+                "machine-learning-e2e.csv",
+                "ml-e2e-" + UUID.randomUUID(),
+                Files.size(datasetPath),
+                "text/csv"
+        );
+        dataset.setStoragePath(datasetPath.toAbsolutePath().toString());
+        dataset = datasetRepository.saveAndFlush(dataset);
+
+        AnalysisJob job = new AnalysisJob(
+                dataset,
+                AnalysisType.MACHINE_LEARNING,
+                AnalysisJobStatus.PENDING
+        );
+        job.setTargetColumn(targetColumn);
+        return analysisJobRepository.saveAndFlush(job);
+    }
+
+    @Test
     void shouldCreateCleanedDatasetVersionThroughPythonCleaning()
             throws Exception
     {
@@ -832,7 +984,7 @@ class JavaPythonE2ETest
             assertNotNull(cleanedDataset.getId());
 
             assertEquals(
-                    "cleaning-e2e.csv_cleaned",
+                    "cleaning-e2e.csv",
                     cleanedDataset.getName()
             );
 
@@ -938,6 +1090,20 @@ class JavaPythonE2ETest
         finally
         {
             Files.deleteIfExists(datasetPath);
+        }
+    }
+
+    private void processJobsUntilTerminal(UUID jobId)
+    {
+        for (int attempt = 0; attempt < 20; attempt++)
+        {
+            AnalysisJob current = analysisJobRepository.findById(jobId).orElseThrow();
+            if (current.getStatus() == AnalysisJobStatus.COMPLETED
+                    || current.getStatus() == AnalysisJobStatus.FAILED)
+            {
+                return;
+            }
+            analysisJobWorker.processPendingJob();
         }
     }
 

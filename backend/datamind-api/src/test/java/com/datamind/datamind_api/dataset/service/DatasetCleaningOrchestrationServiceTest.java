@@ -128,7 +128,7 @@ class DatasetCleaningOrchestrationServiceTest
 
         when(datasetVersionService.createVersion(
                 eq(parentDataset),
-                eq("customers.csv_cleaned"),
+                eq("customers.csv"),
                 eq("cleaned-hash"),
                 eq((long) cleanedContent.length),
                 eq("csv"),
@@ -171,7 +171,7 @@ class DatasetCleaningOrchestrationServiceTest
 
         verify(datasetVersionService).createVersion(
                 eq(parentDataset),
-                eq("customers.csv_cleaned"),
+                eq("customers.csv"),
                 eq("cleaned-hash"),
                 eq((long) cleanedContent.length),
                 eq("csv"),
@@ -278,7 +278,7 @@ class DatasetCleaningOrchestrationServiceTest
 
         verify(datasetVersionService).createVersion(
                 eq(parentDataset),
-                eq("customers.csv_cleaned"),
+                eq("customers.csv"),
                 eq("multi-cleaned-hash"),
                 eq((long) cleanedContent.length),
                 eq("csv"),
@@ -363,7 +363,7 @@ class DatasetCleaningOrchestrationServiceTest
 
         verify(datasetVersionService).createVersion(
                 eq(parentDataset),
-                eq("customers.csv_cleaned"),
+                eq("customers.csv"),
                 eq("unchanged-hash"),
                 eq((long) cleanedContent.length),
                 eq("csv"),

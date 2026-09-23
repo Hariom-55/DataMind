@@ -28,6 +28,7 @@ public class AnalysisJobController
             ){
         AnalysisJob analysisJob = analysisJobService.createAnalysisJob(
                 request.getDatasetId(),
+                request.getDatasetVersionId(),
                 request.getAnalysisType(),
                 request.getTargetColumn()
         );

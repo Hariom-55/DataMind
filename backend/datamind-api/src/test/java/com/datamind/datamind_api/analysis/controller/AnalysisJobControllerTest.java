@@ -51,6 +51,7 @@ public class AnalysisJobControllerTest
 
         when(analysisJobService.createAnalysisJob(
                 datasetId,
+                null,
                 AnalysisType.EDA,
                 null
         )).thenReturn(analysisJob);
@@ -70,6 +71,7 @@ public class AnalysisJobControllerTest
 
         verify(analysisJobService).createAnalysisJob(
                 datasetId,
+                null,
                 AnalysisType.EDA,
                 null
         );

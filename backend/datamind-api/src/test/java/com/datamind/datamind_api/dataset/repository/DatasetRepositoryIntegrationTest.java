@@ -19,7 +19,7 @@ public class DatasetRepositoryIntegrationTest
     private DatasetRepository datasetRepository;
 
     @Test
-    void shouldEnforceUniqueContentHashAtDatabaseLevel()
+    void shouldEnforceUniqueContentHashWithinLogicalDatasetAtDatabaseLevel()
     {
         String uniqueContentHash =
                 "test-hash-" + UUID.randomUUID();
@@ -47,6 +47,8 @@ public class DatasetRepositoryIntegrationTest
         );
 
         datasetRepository.saveAndFlush(firstDataset);
+        secondDataset.setLogicalDatasetId(firstDataset.getLogicalDatasetId());
+        secondDataset.setVersionNumber(2);
 
         assertThrows(
                 DataIntegrityViolationException.class,

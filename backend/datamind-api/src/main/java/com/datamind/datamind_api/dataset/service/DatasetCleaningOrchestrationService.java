@@ -46,7 +46,7 @@ public class DatasetCleaningOrchestrationService
                 );
 
         if (response.content_hash() !=null
-        && response.content_hash().equals(parentDataset.getContentHash())) {
+                && response.content_hash().equals(parentDataset.getContentHash())) {
             return parentDataset;
         }
 
@@ -100,7 +100,7 @@ public class DatasetCleaningOrchestrationService
             Dataset parentDataset
     )
     {
-        return parentDataset.getName() + "_cleaned";
+        return parentDataset.getName();
     }
 
     private String buildOperationSummary(

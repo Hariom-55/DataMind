@@ -1,6 +1,7 @@
 package com.datamind.datamind_api.analysis.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -19,6 +20,14 @@ public class PythonClientConfig {
 
     @Value("${datamind.python.read-timeout:10m}")
     private Duration readTimeout;
+
+    @Bean
+    @Primary
+    public RestClient.Builder datamindRestClientBuilder() {
+        // Avoid transport auto-detection: it probes loopback sockets and can
+        // fail in restricted runtimes before the service has even started.
+        return RestClient.builder();
+    }
 
     @Bean
     public RestClient pythonRestClient(RestClient.Builder restClientBuilder) {

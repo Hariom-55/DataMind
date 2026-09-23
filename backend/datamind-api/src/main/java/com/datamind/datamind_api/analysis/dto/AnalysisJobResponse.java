@@ -7,10 +7,11 @@ import com.datamind.datamind_api.analysis.entity.enums.AnalysisType;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-public class AnalysisJobResponse
-{
+public class AnalysisJobResponse {
     private UUID id;
     private UUID datasetId;
+    private UUID datasetVersionId;
+    private Integer datasetVersion;
     private AnalysisType analysisType;
     private AnalysisJobStatus status;
     private LocalDateTime createdAt;
@@ -19,10 +20,18 @@ public class AnalysisJobResponse
     private String errorMessage;
     private Integer retryCount;
 
-    public AnalysisJobResponse(AnalysisJob analysisJob)
-    {
+    public AnalysisJobResponse(AnalysisJob analysisJob) {
         this.id = analysisJob.getId();
-        this.datasetId = analysisJob.getDataset().getId();
+        this.datasetId = analysisJob.getDataset().getLogicalDatasetId() != null
+                ? analysisJob.getDataset().getLogicalDatasetId()
+                : analysisJob.getDataset().getId();
+
+        var version = analysisJob.getDatasetVersion() != null
+                ? analysisJob.getDatasetVersion()
+                : analysisJob.getDataset();
+
+        this.datasetVersionId = version.getId();
+        this.datasetVersion = version.getVersionNumber();
         this.analysisType = analysisJob.getAnalysisType();
         this.status = analysisJob.getStatus();
         this.createdAt = analysisJob.getCreatedAt();
@@ -30,44 +39,17 @@ public class AnalysisJobResponse
         this.completedAt = analysisJob.getCompletedAt();
         this.errorMessage = analysisJob.getErrorMessage();
         this.retryCount = analysisJob.getRetryCount();
-
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public LocalDateTime getCompletedAt() {
-        return completedAt;
-    }
-
-    public LocalDateTime getStartedAt() {
-        return startedAt;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public AnalysisJobStatus getStatus() {
-        return status;
-    }
-
-    public AnalysisType getAnalysisType() {
-        return analysisType;
-    }
-
-    public UUID getDatasetId() {
-        return datasetId;
-    }
-
-    public String getErrorMessage()
-    {
-        return errorMessage;
-    }
-
-    public Integer getRetryCount()
-    {
-        return retryCount;
-    }
+    public UUID getId() { return id; }
+    public UUID getDatasetId() { return datasetId; }
+    public UUID getDatasetVersionId() { return datasetVersionId; }
+    public Integer getDatasetVersion() { return datasetVersion; }
+    public LocalDateTime getCompletedAt() { return completedAt; }
+    public LocalDateTime getStartedAt() { return startedAt; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public AnalysisJobStatus getStatus() { return status; }
+    public AnalysisType getAnalysisType() { return analysisType; }
+    public String getErrorMessage() { return errorMessage; }
+    public Integer getRetryCount() { return retryCount; }
 }

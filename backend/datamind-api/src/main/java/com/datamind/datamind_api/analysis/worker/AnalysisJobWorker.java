@@ -36,18 +36,21 @@ public class AnalysisJobWorker {
         if (recovered > 0) {
             log.warn("Recovered {} stale analysis jobs", recovered);
         }
-
         analysisJobService.claimNextPendingJob().ifPresent(this::processJob);
     }
 
     private void processJob(AnalysisJob job) {
+        var version = job.getDatasetVersion() != null
+                ? job.getDatasetVersion()
+                : job.getDataset();
+
         try {
             PythonAnalysisResponse response = pythonAnalysisClient.analyze(
                     job.getId(),
-                    job.getDataset().getId(),
+                    version.getId(),
                     job.getAnalysisType().toString(),
-                    job.getDataset().getStoragePath(),
-                    job.getDataset().getFileType(),
+                    version.getStoragePath(),
+                    version.getFileType(),
                     job.getTargetColumn()
             );
 
@@ -55,7 +58,11 @@ public class AnalysisJobWorker {
                     && response.getError() == null
                     && response.getResult() != null) {
                 analysisExecutionService.completeJob(job.getId(), response.getResult());
-                log.info("Analysis job {} completed successfully", job.getId());
+                log.info(
+                        "Analysis job {} completed for dataset version {}",
+                        job.getId(),
+                        version.getVersionNumber()
+                );
             } else {
                 String failureReason = response.getError() != null
                         ? response.getError()
@@ -68,7 +75,11 @@ public class AnalysisJobWorker {
             log.error("Analysis job {} failed calling Python service", job.getId(), ex);
         } catch (Exception ex) {
             analysisJobService.failJob(job.getId(), "Unexpected worker failure");
-            log.error("Unexpected failure while processing analysis job {}", job.getId(), ex);
+            log.error(
+                    "Unexpected failure while processing analysis job {}",
+                    job.getId(),
+                    ex
+            );
         }
     }
 }

@@ -10,6 +10,8 @@ public class CreateAnalysisJobRequest {
     @NotNull
     private UUID datasetId;
 
+    private UUID datasetVersionId;
+
     @NotNull
     private AnalysisType analysisType;
 
@@ -19,9 +21,12 @@ public class CreateAnalysisJobRequest {
     public CreateAnalysisJobRequest() {}
 
     public UUID getDatasetId() { return datasetId; }
+    public UUID getDatasetVersionId() { return datasetVersionId; }
     public AnalysisType getAnalysisType() { return analysisType; }
     public String getTargetColumn() { return targetColumn; }
+
     public void setDatasetId(UUID datasetId) { this.datasetId = datasetId; }
+    public void setDatasetVersionId(UUID datasetVersionId) { this.datasetVersionId = datasetVersionId; }
     public void setAnalysisType(AnalysisType analysisType) { this.analysisType = analysisType; }
     public void setTargetColumn(String targetColumn) { this.targetColumn = targetColumn; }
 }

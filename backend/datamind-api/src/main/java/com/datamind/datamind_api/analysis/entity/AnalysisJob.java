@@ -11,6 +11,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "analysis_jobs")
 public class AnalysisJob {
+
     @Id
     @GeneratedValue
     private UUID id;
@@ -18,6 +19,10 @@ public class AnalysisJob {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "dataset_id", nullable = false)
     private Dataset dataset;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "dataset_version_id", nullable = false)
+    private Dataset datasetVersion;
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
@@ -44,11 +49,26 @@ public class AnalysisJob {
 
     public AnalysisJob() {}
 
-    public AnalysisJob(Dataset dataset, AnalysisType analysisType, AnalysisJobStatus status) {
+    public AnalysisJob(
+            Dataset dataset,
+            Dataset datasetVersion,
+            AnalysisType analysisType,
+            AnalysisJobStatus status
+    ) {
         this.dataset = dataset;
+        this.datasetVersion = datasetVersion;
         this.analysisType = analysisType;
         this.status = status;
         this.createdAt = LocalDateTime.now();
+    }
+
+
+    public AnalysisJob(
+            Dataset dataset,
+            AnalysisType analysisType,
+            AnalysisJobStatus status
+    ) {
+        this(dataset, dataset, analysisType, status);
     }
 
     public UUID getId() { return id; }
@@ -58,6 +78,7 @@ public class AnalysisJob {
     public AnalysisJobStatus getStatus() { return status; }
     public AnalysisType getAnalysisType() { return analysisType; }
     public Dataset getDataset() { return dataset; }
+    public Dataset getDatasetVersion() { return datasetVersion; }
     public Integer getRetryCount() { return retryCount; }
     public String getErrorMessage() { return errorMessage; }
     public String getTargetColumn() { return targetColumn; }
@@ -67,6 +88,7 @@ public class AnalysisJob {
     public void setStatus(AnalysisJobStatus status) { this.status = status; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public void setTargetColumn(String targetColumn) { this.targetColumn = targetColumn; }
+    public void setDatasetVersion(Dataset datasetVersion) { this.datasetVersion = datasetVersion; }
 
     public void markAsProcessing() {
         this.status = AnalysisJobStatus.PROCESSING;

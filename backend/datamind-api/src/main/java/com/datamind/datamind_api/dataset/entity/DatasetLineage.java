@@ -7,7 +7,13 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "dataset_lineage")
+@Table(
+        name = "dataset_lineage",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_dataset_lineage_child_version",
+                columnNames = "child_dataset_id"
+        )
+)
 public class DatasetLineage {
 
     @UuidGenerator
@@ -15,25 +21,17 @@ public class DatasetLineage {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-            name = "parent_dataset_id",
-            nullable = false
-    )
+    @JoinColumn(name = "parent_dataset_id", nullable = false)
     private Dataset parentDataset;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-            name = "child_dataset_id",
-            nullable = false,
-            unique = true
-    )
+    @JoinColumn(name = "child_dataset_id", nullable = false)
     private Dataset childDataset;
 
     @Column(nullable = false)
     private String operation;
 
     private String columnName;
-
     private Integer rowsAffected;
 
     @Column(columnDefinition = "TEXT")
@@ -42,8 +40,7 @@ public class DatasetLineage {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    protected DatasetLineage() {
-    }
+    protected DatasetLineage() {}
 
     public DatasetLineage(
             Dataset parentDataset,
@@ -62,35 +59,12 @@ public class DatasetLineage {
         this.createdAt = LocalDateTime.now();
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public Dataset getParentDataset() {
-        return parentDataset;
-    }
-
-    public Dataset getChildDataset() {
-        return childDataset;
-    }
-
-    public String getOperation() {
-        return operation;
-    }
-
-    public String getColumnName() {
-        return columnName;
-    }
-
-    public Integer getRowsAffected() {
-        return rowsAffected;
-    }
-
-    public String getDetails() {
-        return details;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
+    public UUID getId() { return id; }
+    public Dataset getParentDataset() { return parentDataset; }
+    public Dataset getChildDataset() { return childDataset; }
+    public String getOperation() { return operation; }
+    public String getColumnName() { return columnName; }
+    public Integer getRowsAffected() { return rowsAffected; }
+    public String getDetails() { return details; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
 }

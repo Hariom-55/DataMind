@@ -4,6 +4,7 @@ import com.datamind.datamind_api.dataset.entity.Dataset;
 import com.datamind.datamind_api.dataset.entity.DatasetLineage;
 import com.datamind.datamind_api.dataset.repository.DatasetLineageRepository;
 import com.datamind.datamind_api.dataset.repository.DatasetRepository;
+import com.datamind.datamind_api.dataset.service.DatasetService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -22,6 +23,9 @@ class DatasetVersionServiceTest {
 
     @Mock
     private DatasetLineageRepository lineageRepository;
+
+    @Mock
+    private DatasetService datasetService;
 
     @InjectMocks
     private DatasetVersionService service;

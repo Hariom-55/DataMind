@@ -12,13 +12,16 @@ public class DatasetVersionService {
 
     private final DatasetRepository datasetRepository;
     private final DatasetLineageRepository lineageRepository;
+    private final DatasetService datasetService;
 
     public DatasetVersionService(
             DatasetRepository datasetRepository,
-            DatasetLineageRepository lineageRepository
+            DatasetLineageRepository lineageRepository,
+            DatasetService datasetService
     ) {
         this.datasetRepository = datasetRepository;
         this.lineageRepository = lineageRepository;
+        this.datasetService = datasetService;
     }
 
     @Transactional
@@ -34,6 +37,26 @@ public class DatasetVersionService {
             Integer rowsAffected,
             String details
     ) {
+        if (parentDataset == null) {
+            throw new IllegalArgumentException("Parent dataset is required");
+        }
+
+        java.util.UUID logicalId = parentDataset.getLogicalDatasetId() != null
+                ? parentDataset.getLogicalDatasetId()
+                : (parentDataset.getId() != null ? parentDataset.getId() : java.util.UUID.randomUUID());
+
+        Dataset existing = datasetRepository.findByLogicalDatasetIdAndContentHash(
+                logicalId,
+                contentHash
+        ).orElse(null);
+
+        if (existing != null) {
+            return existing;
+        }
+
+        int nextVersion = java.util.Optional.ofNullable(
+                datasetRepository.findMaxVersionNumber(logicalId)
+        ).orElse(0) + 1;
 
         Dataset childDataset = new Dataset(
                 name,
@@ -41,13 +64,13 @@ public class DatasetVersionService {
                 fileSize,
                 fileType
         );
-
+        childDataset.configureAsVersion(
+                logicalId,
+                nextVersion
+        );
         childDataset.setStoragePath(storagePath);
 
-
-        childDataset = datasetRepository.save(
-                childDataset
-        );
+        childDataset = datasetRepository.save(childDataset);
 
         DatasetLineage lineage = new DatasetLineage(
                 parentDataset,
@@ -57,8 +80,12 @@ public class DatasetVersionService {
                 rowsAffected,
                 details
         );
-
         lineageRepository.save(lineage);
+
+        datasetService.pointRootToCurrentVersion(
+                logicalId,
+                childDataset.getId()
+        );
 
         return childDataset;
     }
