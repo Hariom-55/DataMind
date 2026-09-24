@@ -14,21 +14,30 @@ describe("normalizeAnalysisResult", () => {
     ).toBe(payload);
   });
 
-  it("unwraps nested result wrappers", () => {
+  it("unwraps the canonical result field without inspecting payload keys", () => {
     const payload = {
-      analysis: { eda: {} },
-      insights: {},
-      visualizations: {},
+      overview: { rowCount: 10 },
     };
 
     expect(
-      normalizeAnalysisResult({
-        result: {
-          status: "COMPLETED",
-          result: payload,
-        },
-      }),
+      normalizeAnalysisResult({ contractVersion: "v1", result: payload }),
     ).toBe(payload);
+  });
+
+  it("reads the frozen v1 result envelope", () => {
+    const payload = { overview: { rowCount: 10, columnCount: 2 } };
+    const envelope = {
+      contractVersion: "v1",
+      jobId: "job-1",
+      logicalDatasetId: "dataset-1",
+      datasetVersionId: "version-2",
+      versionNumber: 2,
+      analysisType: "EDA",
+      status: "COMPLETED",
+      result: payload,
+    };
+
+    expect(normalizeAnalysisResult(envelope)).toBe(payload);
   });
 
   it("returns direct EDA results", () => {

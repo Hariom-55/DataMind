@@ -28,6 +28,34 @@ class TestStatisticalAnalysisService:
         assert statistics["min"] == pytest.approx(20.0)
         assert statistics["max"] == pytest.approx(60.0)
 
+    def test_should_run_requested_one_sample_hypothesis_test(self, tmp_path):
+        dataset = pd.DataFrame({"age": [20, 22, 24, 26, 28]})
+        file_path = tmp_path / "hypothesis.csv"
+        dataset.to_csv(file_path, index=False)
+
+        result = self.service.analyze(str(file_path), hypothesis_tests=[{
+            "test": "ONE_SAMPLE_T_TEST",
+            "column": "age",
+            "referenceValue": 20,
+            "alpha": 0.05,
+        }])
+
+        assert len(result["hypothesisTests"]) == 1
+        assert result["hypothesisTests"][0]["test"] == "ONE_SAMPLE_T_TEST"
+        assert result["hypothesisTests"][0]["sampleSize"] == 5
+
+    def test_should_reject_invalid_hypothesis_test_columns(self, tmp_path):
+        dataset = pd.DataFrame({"age": [20, 22, 24]})
+        file_path = tmp_path / "hypothesis-invalid.csv"
+        dataset.to_csv(file_path, index=False)
+
+        with pytest.raises(ValueError, match="Column not found: missing"):
+            self.service.analyze(str(file_path), hypothesis_tests=[{
+                "test": "ONE_SAMPLE_T_TEST",
+                "column": "missing",
+                "referenceValue": 20,
+            }])
+
     def test_should_generate_quartile_statistics(self, tmp_path):
 
         dataset = pd.DataFrame({

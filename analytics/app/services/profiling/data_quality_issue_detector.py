@@ -1,6 +1,6 @@
 import pandas as pd 
 
-class DataCleaningService:
+class DataQualityIssueDetector:
 
     def _detect_missing_values(
             self, 

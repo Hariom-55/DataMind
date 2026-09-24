@@ -79,6 +79,24 @@ class TestDataCleaningEngine:
         assert result["age"].isna().sum() == 0
         assert result.loc[2, "age"] == 23
 
+    def test_should_apply_configured_mean_imputation(self):
+        df = pd.DataFrame({"age": [20, 30, None]})
+
+        result = self.engine.apply_operation(
+            df, "IMPUTE_MISSING_VALUES", "age", {"strategy": "MEAN"}
+        )
+
+        assert result.loc[2, "age"] == 25
+
+    def test_should_apply_constant_imputation(self):
+        df = pd.DataFrame({"age": [20, None]})
+
+        result = self.engine.apply_operation(
+            df, "IMPUTE_MISSING_VALUES", "age", {"strategy": "CONSTANT", "value": "7"}
+        )
+
+        assert result.loc[1, "age"] == 7
+
     def test_should_normalize_categories(self):
 
         df = pd.DataFrame({

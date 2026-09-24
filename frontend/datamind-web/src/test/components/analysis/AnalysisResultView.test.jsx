@@ -6,7 +6,9 @@ describe("AnalysisResultView", () => {
   it("renders the aggregated analysis dashboard", () => {
     render(
       <AnalysisResultView
+        analysisType="INSIGHT"
         result={{
+          analysisType: "INSIGHT",
           result: {
             analysis: {
               eda: {
@@ -58,7 +60,9 @@ describe("AnalysisResultView", () => {
   it("renders an EDA-only result without empty insight or visualization panels", () => {
     render(
       <AnalysisResultView
+        analysisType="EDA"
         result={{
+          analysisType: "EDA",
           result: {
             overview: {
               rowCount: 10,

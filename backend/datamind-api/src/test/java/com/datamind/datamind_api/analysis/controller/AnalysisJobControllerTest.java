@@ -51,9 +51,11 @@ public class AnalysisJobControllerTest
 
         when(analysisJobService.createAnalysisJob(
                 datasetId,
-                null,
+                datasetId,
                 AnalysisType.EDA,
-                null
+                null,
+                true,
+                java.util.List.of()
         )).thenReturn(analysisJob);
 
         mockMvc.perform(
@@ -61,38 +63,44 @@ public class AnalysisJobControllerTest
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                             {
-                                "datasetId": "%s",
-                                "analysisType": "EDA"
+                                "logicalDatasetId": "%s",
+                                "datasetVersionId": "%s",
+                                "analysisType": "EDA",
+                                "enableHyperparameterTuning": true
                             }
-                            """.formatted(datasetId))
+                            """.formatted(datasetId, datasetId))
                 )
                 .andDo(MockMvcResultHandlers.print())
                 .andExpect(status().isAccepted());
 
         verify(analysisJobService).createAnalysisJob(
                 datasetId,
-                null,
+                datasetId,
                 AnalysisType.EDA,
-                null
+                null,
+                true,
+                java.util.List.of()
         );
     }
 
     @Test
     void shouldRejectRequestWhenDatasetIdIsMissing() throws Exception
     {
+        UUID versionId = UUID.randomUUID();
         mockMvc.perform(
                         post("/api/analysis/jobs")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                             {
+                                "datasetVersionId": "%s",
                                 "analysisType": "EDA"
                             }
-                            """)
+                            """.formatted(versionId))
                 )
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.message").value("datasetId: must not be null"))
+                .andExpect(jsonPath("$.message").value("logicalDatasetId: must not be null"))
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
@@ -106,9 +114,10 @@ public class AnalysisJobControllerTest
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                             {
-                                "datasetId": "%s"
+                                "logicalDatasetId": "%s",
+                                "datasetVersionId": "%s"
                             }
-                            """.formatted(datasetId))
+                            """.formatted(datasetId, datasetId))
                 )
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
@@ -127,10 +136,11 @@ public class AnalysisJobControllerTest
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
                             {
-                                "datasetId": "%s",
+                                "logicalDatasetId": "%s",
+                                "datasetVersionId": "%s",
                                 "analysisType": "INVALID"
                             }
-                            """.formatted(datasetId))
+                            """.formatted(datasetId, datasetId))
                 )
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
@@ -138,6 +148,18 @@ public class AnalysisJobControllerTest
                 .andExpect(jsonPath("$.message")
                         .value("Request body contains invalid or malformed data"))
                 .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    void shouldRequireAnExplicitDatasetVersion() throws Exception {
+        UUID logicalId = UUID.randomUUID();
+        mockMvc.perform(post("/api/analysis/jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"logicalDatasetId":"%s","analysisType":"EDA"}
+                                """.formatted(logicalId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("datasetVersionId: must not be null"));
     }
 
     @Test
@@ -246,6 +268,24 @@ public class AnalysisJobControllerTest
                         .value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message")
                         .value("Request body contains invalid or malformed data"));
+    }
+
+    @Test
+    void shouldReturnAnalysisHistoryFilteredByVersionTypeAndStatus() throws Exception {
+        UUID logicalId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        when(analysisJobService.getAnalysisHistory(
+                logicalId, versionId, AnalysisType.EDA, AnalysisJobStatus.COMPLETED, 20
+        )).thenReturn(java.util.List.of());
+
+        mockMvc.perform(get("/api/analysis/jobs")
+                        .param("logicalDatasetId", logicalId.toString())
+                        .param("datasetVersionId", versionId.toString())
+                        .param("analysisType", "EDA")
+                        .param("status", "COMPLETED")
+                        .param("limit", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
     }
 
 

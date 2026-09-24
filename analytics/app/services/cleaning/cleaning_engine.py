@@ -6,10 +6,12 @@ class DataCleaningEngine:
             self,
             df:pd.DataFrame,
             operation: str,
-            column: str | None = None
+            column: str | None = None,
+            parameters: dict | None = None
     )-> pd.DataFrame:
 
         cleaned_df = df.copy()
+        parameters = parameters or {}
 
         if operation == "REMOVE_DUPLICATES":
             return self._remove_duplicates(
@@ -25,13 +27,15 @@ class DataCleaningEngine:
         if operation == "IMPUTE_MISSING_VALUES":
             return self._impute_missing_values(
                 cleaned_df,
-                column
+                column,
+                parameters
             )
 
         if operation == "NORMALIZE_CATEGORIES":
             return self._normalize_categories(
                 cleaned_df,
-                column
+                column,
+                parameters
             )
 
         if operation == "REMOVE_FEATURE":
@@ -105,7 +109,8 @@ class DataCleaningEngine:
     def _impute_missing_values(
             self,
             df: pd.DataFrame,
-            column: str | None
+            column: str | None,
+            parameters: dict
     ) -> pd.DataFrame:
 
         if column is None:
@@ -119,12 +124,27 @@ class DataCleaningEngine:
                 f"Column '{column}' not found"
             )
 
-        if pd.api.types.is_numeric_dtype(
-                df[column]
-        ):
-            value = df[column].median()
+        strategy = parameters.get("strategy", "AUTO")
+        is_numeric = pd.api.types.is_numeric_dtype(df[column])
+        if strategy == "AUTO":
+            strategy = "MEDIAN" if is_numeric else "MODE"
 
-        else:
+        if strategy == "CONSTANT":
+            value = parameters["value"]
+            if is_numeric:
+                try:
+                    value = float(value)
+                except (TypeError, ValueError) as error:
+                    raise ValueError("CONSTANT imputation requires a numeric value for this column") from error
+        elif strategy == "MEDIAN":
+            if not is_numeric:
+                raise ValueError("MEDIAN imputation requires a numeric column")
+            value = df[column].median()
+        elif strategy == "MEAN":
+            if not is_numeric:
+                raise ValueError("MEAN imputation requires a numeric column")
+            value = df[column].mean()
+        elif strategy == "MODE":
             mode = df[column].mode()
 
             if mode.empty:
@@ -134,6 +154,8 @@ class DataCleaningEngine:
                 )
 
             value = mode.iloc[0]
+        else:
+            raise ValueError(f"Unsupported imputation strategy: {strategy}")
 
         df[column] = df[column].fillna(value)
 
@@ -142,7 +164,8 @@ class DataCleaningEngine:
     def _normalize_categories(
             self,
             df: pd.DataFrame,
-            column: str | None
+            column: str | None,
+            parameters: dict
     ) -> pd.DataFrame:
 
         if column is None:
@@ -169,12 +192,12 @@ class DataCleaningEngine:
                 "categorical or string"
             )
 
-        df[column] = (
-            df[column]
-            .astype("string")
-            .str.strip()
-            .str.lower()
-        )
+        values = df[column].astype("string")
+        if parameters.get("trim", True):
+            values = values.str.strip()
+        if parameters.get("lowercase", True):
+            values = values.str.lower()
+        df[column] = values
 
         return df
 

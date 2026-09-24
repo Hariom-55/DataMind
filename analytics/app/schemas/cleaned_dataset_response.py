@@ -4,9 +4,12 @@ from dataclasses import dataclass
 @dataclass
 class CleanedDatasetResponse:
 
-    content: str
-    content_hash: str
+    artifact_id: str
+    sha256: str
     extension: str
+    format: str
+    content_type: str
+    size_bytes: int
 
     original_rows: int
     cleaned_rows: int

@@ -14,6 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import java.util.List;
+import java.util.Map;
 
 @ExtendWith(MockitoExtension.class)
 class DatasetVersionServiceTest {
@@ -59,6 +61,11 @@ class DatasetVersionServiceTest {
                 datasetRepository.save(any(Dataset.class))
         ).thenReturn(childDataset);
 
+        List<Map<String, Object>> operationConfig = List.of(Map.of(
+                "operation", "IMPUTE_MISSING_VALUES",
+                "column", "age",
+                "parameters", Map.of("strategy", "MEAN")
+        ));
         Dataset result = service.createVersion(
                 parentDataset,
                 "customers_cleaned.csv",
@@ -69,7 +76,8 @@ class DatasetVersionServiceTest {
                 "REMOVE_DUPLICATES",
                 null,
                 10,
-                "10 duplicate rows removed"
+                "10 duplicate rows removed",
+                operationConfig
         );
 
         assertSame(
@@ -152,6 +160,7 @@ class DatasetVersionServiceTest {
                 "10 duplicate rows removed",
                 lineage.getDetails()
         );
+        assertEquals(operationConfig, lineage.getOperationConfig());
     }
 
 

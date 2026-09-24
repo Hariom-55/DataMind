@@ -105,6 +105,7 @@ DataMind/
 - Store file content on disk and dataset metadata in PostgreSQL.
 - Calculate content hashes and detect repeated content within a logical dataset family.
 - Keep dataset versions and record lineage for generated or transformed versions.
+- Select a specific dataset version before starting an analysis; each job stores the chosen version ID.
 
 ### Analysis and insights
 
@@ -113,7 +114,7 @@ DataMind/
 - **Supervised machine learning:** regression or classification when a target column is supplied, including preprocessing and evaluation output.
 - **Unsupervised machine learning:** numeric-feature K-Means clustering and PCA when no target column is supplied.
 - **Insights and visualizations:** insight generation and visualization specifications for EDA, statistical, and machine-learning dashboards.
-- **Cleaning workflow:** supported cleaning operations can be sent to the internal analytics service; generated dataset versions and lineage can be recorded by the backend orchestration service.
+- **Cleaning workflow:** review quality recommendations for a selected version, preview supported operations without changing the source, then apply them to create a new version with lineage.
 
 The analysis types currently registered in the Python service are `EDA`, `STATISTICAL`, `MACHINE_LEARNING`, and `INSIGHT`. Although time-series and text analysis appear in the wider type model/product direction, they are not currently available as executable analysis workflows.
 
@@ -226,11 +227,11 @@ The public API is served by Spring Boot at `http://localhost:8080`.
 |---|---|---|
 | `POST` | `/api/datasets` | Upload a file using multipart form field `file`; optional `datasetId` associates it with a logical dataset. |
 | `GET` | `/api/datasets` | List dataset records. |
-| `GET` | `/api/datasets/{id}` | Retrieve dataset metadata. |
+| `GET` | `/api/datasets/{datasetVersionId}` | Retrieve one version's metadata. |
 | `GET` | `/api/datasets/{logicalDatasetId}/versions` | List dataset versions. |
 | `GET` | `/api/datasets/{logicalDatasetId}/versions/{versionNumber}` | Retrieve a specific version. |
 | `GET` | `/api/datasets/{logicalDatasetId}/current` | Retrieve the current version. |
-| `GET` | `/api/datasets/{datasetId}/lineage` | Retrieve lineage records. |
+| `GET` | `/api/datasets/{datasetVersionId}/lineage` | Retrieve version lineage. |
 | `POST` | `/api/analysis/jobs` | Create an asynchronous analysis job; returns `202 Accepted`. |
 | `GET` | `/api/analysis/jobs/{id}` | Check job status. |
 | `GET` | `/api/analysis/jobs/{jobId}/result` | Retrieve the persisted result. |
@@ -239,11 +240,17 @@ Example request for unsupervised ML:
 
 ```json
 {
-  "datasetId": "93e48716-70f6-468e-8c34-9efe055926eb",
+  "logicalDatasetId": "93e48716-70f6-468e-8c34-9efe055926eb",
+  "datasetVersionId": "f528134c-110c-441c-a693-a09955d07698",
   "analysisType": "MACHINE_LEARNING",
-  "targetColumn": null
+  "targetColumn": null,
+  "enableHyperparameterTuning": false
 }
 ```
+
+For supervised machine learning, set `enableHyperparameterTuning` to `true`
+to opt into the random forest grid search when a random forest model is selected.
+The default is `false`.
 
 The internal Python endpoints `/internal/analyze` and `/internal/clean` are service-to-service interfaces. Full request and response details are available in [API endpoint documentation](docs/API_ENDPOINTS.md) and [API contracts](<docs/API_CONTRACTS(1).md>).
 

@@ -95,6 +95,28 @@ class TestEdaVisualizationGenerator:
         assert result[1]["title"] == "Salary Distribution"
         assert result[1]["x"] == "salary"
 
+    def test_should_generate_canonical_box_plot_summary_for_outliers(self):
+        analysis_results = {
+            "numericStatistics": {"age": {
+                "min": 1, "25%": 3, "50%": 5, "75%": 7, "max": 20,
+            }},
+            "outlierSignals": {"age": {"lowerBound": -3, "upperBound": 13}},
+        }
+
+        result = self.generate.generate(analysis_results)
+        box_plot = next(item for item in result if item["type"] == "BOX_PLOT")
+
+        assert box_plot["data"] == [{
+            "column": "age",
+            "min": 1,
+            "q1": 3,
+            "median": 5,
+            "q3": 7,
+            "max": 20,
+            "lowerBound": -3,
+            "upperBound": 13,
+        }]
+
     def test_should_generate_categorical_visualization(self):
 
         analysis_results = {

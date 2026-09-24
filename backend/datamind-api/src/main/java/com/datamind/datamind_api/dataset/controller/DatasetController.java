@@ -23,19 +23,29 @@ public class DatasetController {
     @PostMapping(consumes = "multipart/form-data")
     public ResponseEntity<DatasetResponse> uploadDataset(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "datasetId", required = false) UUID datasetId
+            @RequestParam(value = "logicalDatasetId", required = false) UUID logicalDatasetId,
+            @RequestParam(value = "datasetId", required = false) UUID legacyDatasetId
     ) {
-        Dataset dataset = datasetId == null
+        if (logicalDatasetId != null && legacyDatasetId != null
+                && !logicalDatasetId.equals(legacyDatasetId)) {
+            throw new IllegalArgumentException(
+                    "logicalDatasetId and legacy datasetId must match when both are supplied"
+            );
+        }
+        UUID requestedLogicalId = logicalDatasetId != null ? logicalDatasetId : legacyDatasetId;
+        Dataset dataset = requestedLogicalId == null
                 ? datasetService.uploadDataset(file)
-                : datasetService.uploadDataset(file, datasetId);
+                : datasetService.uploadDataset(file, requestedLogicalId);
 
         return ResponseEntity.ok(new DatasetResponse(dataset));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<DatasetResponse> getDatasetById(@PathVariable UUID id) {
+    @GetMapping("/{datasetVersionId}")
+    public ResponseEntity<DatasetResponse> getDatasetVersionById(
+            @PathVariable UUID datasetVersionId
+    ) {
         return ResponseEntity.ok(
-                new DatasetResponse(datasetService.getDatasetById(id))
+                new DatasetResponse(datasetService.getDatasetById(datasetVersionId))
         );
     }
 

@@ -8,14 +8,14 @@ class DataCleaningWorkflowService:
 
     def __init__(
             self,
-            cleaning_service,
+            quality_service,
             recommendation_service=None,
             cleaning_engine=None,
             change_tracker=None,
             cleaned_dataset_result_service=None
     ):
 
-        self.cleaning_service = cleaning_service
+        self.quality_service = quality_service
 
         self.recommendation_service = (
             recommendation_service
@@ -43,7 +43,7 @@ class DataCleaningWorkflowService:
     ) -> dict:
 
         quality_report = (
-            self.cleaning_service.assess_quality(df)
+            self.quality_service.assess_quality(df)
         )
 
         recommendations = (
@@ -73,6 +73,9 @@ class DataCleaningWorkflowService:
 
         for operation_request in operations:
 
+            if hasattr(operation_request, "model_dump"):
+                operation_request = operation_request.model_dump(exclude_none=True)
+
             operation = operation_request.get(
                 "operation"
             )
@@ -81,13 +84,16 @@ class DataCleaningWorkflowService:
                 "column"
             )
 
+            parameters = operation_request.get("parameters", {})
+
             before = cleaned_df.copy()
 
             cleaned_df = (
                 self.cleaning_engine.apply_operation(
                     cleaned_df,
                     operation,
-                    column
+                    column,
+                    parameters
                 )
             )
 
@@ -99,6 +105,7 @@ class DataCleaningWorkflowService:
                     column=column
                 )
             )
+            change["parameters"] = parameters
 
             changes.append(change)
 

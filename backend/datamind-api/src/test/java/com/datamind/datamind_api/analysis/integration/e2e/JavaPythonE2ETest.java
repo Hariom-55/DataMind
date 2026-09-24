@@ -17,7 +17,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 import com.datamind.datamind_api.analysis.entity.AnalysisJob;
 import com.datamind.datamind_api.analysis.entity.AnalysisResult;
@@ -32,15 +36,25 @@ import com.datamind.datamind_api.analysis.integration.python.dto.PythonCleaningO
 import com.datamind.datamind_api.dataset.entity.DatasetLineage;
 import com.datamind.datamind_api.dataset.repository.DatasetLineageRepository;
 import com.datamind.datamind_api.dataset.service.DatasetCleaningOrchestrationService;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(
         properties = {
                 "spring.task.scheduling.enabled=false"
         }
 )
+@AutoConfigureMockMvc
 @Transactional
 class JavaPythonE2ETest
 {
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
     @Autowired
     private DatasetRepository datasetRepository;
 
@@ -58,6 +72,52 @@ class JavaPythonE2ETest
 
     @Autowired
     private DatasetLineageRepository datasetLineageRepository;
+
+    @Test
+    void shouldCompletePublicCleaningRecommendationsPreviewApplyAndLineageWorkflow() throws Exception {
+        Path source = Files.createTempFile("datamind-public-cleaning-", ".csv");
+        Path generatedVersionFile = null;
+        try {
+            Files.writeString(source, "name,age\nA,20\nA,20\nB,30\n");
+            Dataset root = new Dataset("public-cleaning.csv", "public-cleaning-" + UUID.randomUUID(), Files.size(source), "text/csv");
+            root.setStoragePath(source.toAbsolutePath().toString());
+            root = datasetRepository.saveAndFlush(root);
+            String base = "/api/datasets/" + root.getLogicalDatasetId() + "/versions/" + root.getId() + "/cleaning";
+
+            mockMvc.perform(get(base + "/recommendations"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalRows").value(3))
+                    .andExpect(jsonPath("$.recommendations").isArray());
+
+            mockMvc.perform(post(base + "/preview")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"operations\":[{\"operation\":\"REMOVE_DUPLICATES\"}]}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.logicalDatasetId").value(root.getLogicalDatasetId().toString()))
+                    .andExpect(jsonPath("$.datasetVersionId").value(root.getId().toString()))
+                    .andExpect(jsonPath("$.originalRows").value(3))
+                    .andExpect(jsonPath("$.cleanedRows").value(2));
+
+            var applyResult = mockMvc.perform(post(base)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"operations\":[{\"operation\":\"REMOVE_DUPLICATES\"}]}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.dataset.logicalDatasetId").value(root.getLogicalDatasetId().toString()))
+                    .andExpect(jsonPath("$.dataset.versionNumber").value(2))
+                    .andExpect(jsonPath("$.lineage[0].operation").value("REMOVE_DUPLICATES"))
+                    .andReturn();
+
+            var responseBody = objectMapper.readTree(applyResult.getResponse().getContentAsString());
+            UUID childId = UUID.fromString(responseBody.path("dataset").path("datasetVersionId").asText());
+            Dataset child = datasetRepository.findById(childId).orElseThrow();
+            generatedVersionFile = Path.of(child.getStoragePath());
+            assertEquals(root.getLogicalDatasetId(), child.getLogicalDatasetId());
+            assertTrue(datasetLineageRepository.findByChildDataset(child).isPresent());
+        } finally {
+            Files.deleteIfExists(source);
+            if (generatedVersionFile != null) Files.deleteIfExists(generatedVersionFile);
+        }
+    }
 
 
     @Test

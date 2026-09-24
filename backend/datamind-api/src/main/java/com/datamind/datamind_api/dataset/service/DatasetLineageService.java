@@ -29,15 +29,15 @@ public class DatasetLineageService {
 
     @Transactional(readOnly = true)
     public List<DatasetLineageResponse> getLineage(
-            UUID datasetId
+            UUID datasetVersionId
     ) {
 
         Dataset currentDataset = datasetRepository
-                .findById(datasetId)
+                .findById(datasetVersionId)
                 .orElseThrow(() ->
                         new DatasetNotFoundException(
                                 "Dataset not found: "
-                                        + datasetId
+                                        + datasetVersionId
                         )
                 );
 
@@ -83,7 +83,8 @@ public class DatasetLineageService {
                 lineage.getColumnName(),
                 lineage.getRowsAffected(),
                 lineage.getDetails(),
-                lineage.getCreatedAt()
+                lineage.getCreatedAt(),
+                lineage.getOperationConfig()
         );
     }
 }

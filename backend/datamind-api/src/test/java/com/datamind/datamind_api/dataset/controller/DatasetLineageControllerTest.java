@@ -65,13 +65,15 @@ class DatasetLineageControllerTest {
                         jsonPath("$.length()").value(1)
                 )
                 .andExpect(
-                        jsonPath("$[0].datasetId")
+                        jsonPath("$[0].datasetVersionId")
                                 .value(datasetId.toString())
                 )
                 .andExpect(
-                        jsonPath("$[0].parentDatasetId")
+                        jsonPath("$[0].parentDatasetVersionId")
                                 .value(parentDatasetId.toString())
                 )
+                .andExpect(jsonPath("$[0].datasetId").value(datasetId.toString()))
+                .andExpect(jsonPath("$[0].parentDatasetId").value(parentDatasetId.toString()))
                 .andExpect(
                         jsonPath("$[0].operation")
                                 .value("REMOVE_DUPLICATES")

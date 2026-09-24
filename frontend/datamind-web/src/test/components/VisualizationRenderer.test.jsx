@@ -103,6 +103,27 @@ describe("VisualizationRenderer", () => {
     ).toBeInTheDocument();
   });
 
+  it.each(["LINE", "SCATTER", "HISTOGRAM", "PIE"])("selects a chart renderer for %s", (type) => {
+    const data = type === "SCATTER"
+      ? [{ x: 1, y: 2 }]
+      : [{ category: "a", value: 2 }];
+    const { container } = render(<VisualizationRenderer visualization={{ type, data, x: type === "SCATTER" ? "x" : "category", y: type === "SCATTER" ? "y" : "value" }} />);
+
+    expect(container.querySelector(".chart-container")).toBeInTheDocument();
+  });
+
+  it("rejects malformed numeric chart data", () => {
+    render(<VisualizationRenderer visualization={{ type: "LINE", data: [{ category: "a", value: "bad" }], x: "category", y: "value" }} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Invalid line chart data");
+  });
+
+  it("shows a useful empty state for charts with no rows", () => {
+    render(<VisualizationRenderer visualization={{ type: "HISTOGRAM", data: [], x: "bin", y: "count" }} />);
+
+    expect(screen.getByText("No chart data")).toBeInTheDocument();
+  });
+
   it("handles an unsupported visualization type", () => {
     const visualization = {
       type: "UNKNOWN",

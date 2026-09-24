@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.UUID;
 
 public record  PythonCleaningRequest (
-        @JsonProperty("dataset_id")
-        UUID datasetId,
+        @JsonProperty("dataset_version_id")
+        UUID datasetVersionId,
         @JsonProperty("dataset_path")
         String datasetPath,
         @JsonProperty("operations")

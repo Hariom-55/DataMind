@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from app.services.cleaning.cleaning_service import DataCleaningService
+from app.services.profiling.data_quality_service import DataQualityService
 
 
 from app.services.cleaning.cleaning_workflow_service import  DataCleaningWorkflowService
@@ -13,7 +13,7 @@ class TestDataCleaningWorkflowService:
     def setup_method(self):
 
         self.cleaning_service = (
-            DataCleaningService()
+            DataQualityService()
         )
 
         self.workflow_service = (
@@ -374,7 +374,7 @@ class TestDataCleaningWorkflowService:
 
         assert len(result.content_hash) == 64
 
-    def test_should_preserve_extension(self):
+    def test_should_normalize_cleaned_output_to_csv(self):
 
         df = pd.DataFrame({
             "name": ["Hariom"]
@@ -383,7 +383,7 @@ class TestDataCleaningWorkflowService:
         result = self.workflow_service.clean_dataset_result(
             df,
             [],
-            ".csv"
+            ".xlsx"
         )
 
         assert result.extension == "csv"

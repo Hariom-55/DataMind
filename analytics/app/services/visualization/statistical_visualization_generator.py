@@ -1,6 +1,7 @@
 from app.services.visualization.visualization_generator import VisualizationGenerator
 from app.services.visualization.visualization_spec import VisualizationSpec
 from app.services.visualization.visualization_types import VisualizationType
+from app.services.visualization.visualization_limits import MAX_CORRELATION_COLUMNS
 
 
 class StatisticalVisualizationGenerator(VisualizationGenerator):
@@ -50,7 +51,8 @@ class StatisticalVisualizationGenerator(VisualizationGenerator):
             if not matrix:
                 continue
 
-            columns = list(matrix.keys())
+            all_columns = list(matrix.keys())
+            columns = all_columns[:MAX_CORRELATION_COLUMNS]
 
             data = []
 
@@ -88,6 +90,8 @@ class StatisticalVisualizationGenerator(VisualizationGenerator):
                     "source": "STATISTICS",
                     "metric": metric,
                     "columns": columns,
+                    "totalColumns": len(all_columns),
+                    "truncatedColumns": max(0, len(all_columns) - len(columns)),
                 },
             )
 

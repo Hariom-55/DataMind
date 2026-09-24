@@ -124,7 +124,7 @@ class TestCleanedDatasetResultService:
 
         result = service.build_result(
             cleaning_result,
-            ".csv"
+            ".xlsx"
         )
 
         assert result.extension == "csv"

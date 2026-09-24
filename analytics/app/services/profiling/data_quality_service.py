@@ -1,6 +1,8 @@
 import pandas as pd
+from app.services.profiling.data_quality_issue_detector import DataQualityIssueDetector
 
-class DataQualityService:
+
+class DataQualityService(DataQualityIssueDetector):
 
     def analyze(
             self,

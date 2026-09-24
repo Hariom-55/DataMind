@@ -11,28 +11,7 @@ function normalizeAnalysisResult(response) {
     return null;
   }
 
-  let current = response;
-
-  for (let depth = 0; depth < 5; depth += 1) {
-    if (
-      current.analysis ||
-      current.insights ||
-      current.visualizations
-    ) {
-      return current;
-    }
-
-    if (
-      isObject(current.result)
-    ) {
-      current = current.result;
-      continue;
-    }
-
-    break;
-  }
-
-  return current;
+  return isObject(response.result) ? response.result : response;
 }
 
 export {

@@ -50,6 +50,8 @@ class AnalysisJobServiceTest {
         Dataset dataset = mock(Dataset.class);
         AnalysisJob savedJob = mock(AnalysisJob.class);
 
+        when(dataset.getId()).thenReturn(datasetId);
+        when(dataset.getLogicalDatasetId()).thenReturn(datasetId);
         when(datasetService.getDatasetById(datasetId)).thenReturn(dataset);
         when(analysisJobRepository.save(any(AnalysisJob.class))).thenReturn(savedJob);
 
@@ -58,7 +60,7 @@ class AnalysisJobServiceTest {
         );
 
         assertSame(savedJob, result);
-        verify(datasetService).getDatasetById(datasetId);
+        verify(datasetService, atLeastOnce()).getDatasetById(datasetId);
         verify(analysisJobRepository).save(any(AnalysisJob.class));
     }
 
@@ -66,6 +68,8 @@ class AnalysisJobServiceTest {
     void shouldTrimTargetColumnWhenCreatingJob() {
         UUID datasetId = UUID.randomUUID();
         Dataset dataset = mock(Dataset.class);
+        when(dataset.getId()).thenReturn(datasetId);
+        when(dataset.getLogicalDatasetId()).thenReturn(datasetId);
         when(datasetService.getDatasetById(datasetId)).thenReturn(dataset);
         when(analysisJobRepository.save(any(AnalysisJob.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -75,6 +79,32 @@ class AnalysisJobServiceTest {
         );
 
         assertEquals("profit", result.getTargetColumn());
+    }
+
+    @Test
+    void shouldPersistHyperparameterTuningOptIn() {
+        UUID logicalId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        Dataset dataset = mock(Dataset.class);
+        Dataset version = mock(Dataset.class);
+        when(dataset.getId()).thenReturn(logicalId);
+        when(dataset.getLogicalDatasetId()).thenReturn(logicalId);
+        when(version.getId()).thenReturn(versionId);
+        when(version.getLogicalDatasetId()).thenReturn(logicalId);
+        when(datasetService.getDatasetById(logicalId)).thenReturn(dataset);
+        when(datasetService.getDatasetById(versionId)).thenReturn(version);
+        when(analysisJobRepository.save(any(AnalysisJob.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AnalysisJob result = analysisJobService.createAnalysisJob(
+                logicalId,
+                versionId,
+                AnalysisType.MACHINE_LEARNING,
+                "profit",
+                true
+        );
+
+        assertTrue(result.isEnableHyperparameterTuning());
     }
 
     @Test
@@ -109,6 +139,20 @@ class AnalysisJobServiceTest {
 
         assertEquals("analysisType is required", exception.getMessage());
         verify(analysisJobRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectAnalysisTypesWithoutRegisteredImplementations() {
+        UUID datasetId = UUID.randomUUID();
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> analysisJobService.createAnalysisJob(
+                        datasetId, AnalysisType.TIME_SERIES, null
+                )
+        );
+
+        assertEquals("Unsupported analysis type: TIME_SERIES", exception.getMessage());
+        verifyNoInteractions(analysisJobRepository);
     }
 
     @Test
@@ -239,6 +283,8 @@ class AnalysisJobServiceTest {
         Dataset dataset = mock(Dataset.class);
         AnalysisJob savedJob = mock(AnalysisJob.class);
 
+        when(dataset.getId()).thenReturn(datasetId);
+        when(dataset.getLogicalDatasetId()).thenReturn(datasetId);
         when(datasetService.getDatasetById(datasetId)).thenReturn(dataset);
         when(analysisJobRepository.save(any(AnalysisJob.class))).thenReturn(savedJob);
 
@@ -248,5 +294,43 @@ class AnalysisJobServiceTest {
 
         assertSame(savedJob, result);
         verify(analysisJobRepository).save(any(AnalysisJob.class));
+    }
+
+    @Test
+    void shouldQueryAnalysisHistoryWithFiltersAndBoundedLimit() {
+        UUID logicalId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        analysisJobService.getAnalysisHistory(
+                logicalId, versionId, AnalysisType.EDA, AnalysisJobStatus.COMPLETED, 500
+        );
+
+        verify(analysisJobRepository).findHistory(
+                eq(logicalId), eq(versionId), eq(AnalysisType.EDA),
+                eq(AnalysisJobStatus.COMPLETED), argThat(pageable -> pageable.getPageSize() == 100)
+        );
+    }
+
+    @Test
+    void shouldPersistHypothesisTestConfigurationForStatisticalJobs() {
+        UUID logicalId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        Dataset dataset = mock(Dataset.class);
+        Dataset version = mock(Dataset.class);
+        var testRequest = List.of(java.util.Map.<String, Object>of(
+                "test", "ONE_SAMPLE_T_TEST", "column", "age", "referenceValue", 25.0,
+                "alpha", 0.05
+        ));
+        when(dataset.getLogicalDatasetId()).thenReturn(logicalId);
+        when(version.getLogicalDatasetId()).thenReturn(logicalId);
+        when(datasetService.getDatasetById(logicalId)).thenReturn(dataset);
+        when(datasetService.getDatasetById(versionId)).thenReturn(version);
+        when(analysisJobRepository.save(any(AnalysisJob.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        AnalysisJob job = analysisJobService.createAnalysisJob(
+                logicalId, versionId, AnalysisType.STATISTICAL, null, false, testRequest
+        );
+
+        assertEquals(testRequest, job.getHypothesisTests());
     }
 }

@@ -52,4 +52,10 @@ describe("BarVisualization", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it("rejects rows without a configured numeric value", () => {
+    render(<BarVisualization visualization={{ type: "BAR", data: [{ column: "age", missingCount: "many" }], x: "column", y: "missingCount" }} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Invalid bar chart data");
+  });
 });

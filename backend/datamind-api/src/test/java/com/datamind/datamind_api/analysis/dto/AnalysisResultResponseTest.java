@@ -22,6 +22,11 @@ class AnalysisResultResponseTest {
         AnalysisResultResponse response = new AnalysisResultResponse(result);
 
         assertEquals(AnalysisType.INSIGHT, response.getAnalysisType());
+        assertEquals("v1", response.getContractVersion());
+        assertEquals(AnalysisJobStatus.COMPLETED, response.getStatus());
+        assertEquals(dataset.getLogicalDatasetId(), response.getLogicalDatasetId());
+        assertEquals(dataset.getId(), response.getDatasetVersionId());
+        assertEquals(dataset.getVersionNumber(), response.getVersionNumber());
         assertEquals(job.getId(), response.getJobId());
         assertEquals(result.getResultData(), response.getResult());
         assertEquals(result.getCreatedAt(), response.getCreatedAt());

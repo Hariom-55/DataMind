@@ -74,9 +74,12 @@ public class PythonCleaningClientTest
                         withSuccess(
                                 """
                                 {
-                                    "content": "bmFtZSxhZ2UKSGFyaW9tLDIyCg==",
-                                    "content_hash": "abc123",
+                                    "artifact_id": "11111111-1111-1111-1111-111111111111",
+                                    "sha256": "abc123",
                                     "extension": "csv",
+                                    "format": "CSV",
+                                    "content_type": "text/csv",
+                                    "size_bytes": 15,
                                     "original_rows": 10,
                                     "cleaned_rows": 10,
                                     "original_columns": 3,
@@ -108,7 +111,7 @@ public class PythonCleaningClientTest
 
         assertEquals(
                 "abc123",
-                response.content_hash()
+                response.sha256()
         );
 
         assertEquals(
@@ -141,7 +144,10 @@ public class PythonCleaningClientTest
                 response.operations_applied()
         );
 
-        assertNotNull(response.content());
+        assertEquals(
+                "11111111-1111-1111-1111-111111111111",
+                response.artifact_id()
+        );
 
         assertNotNull(response.changes());
 
@@ -199,9 +205,12 @@ public class PythonCleaningClientTest
                         withSuccess(
                                 """
                                 {
-                                    "content": "Y2l0eSxhZ2UKZGVsaGksMjIK",
-                                    "content_hash": "def456",
+                                    "artifact_id": "22222222-2222-2222-2222-222222222222",
+                                    "sha256": "def456",
                                     "extension": "csv",
+                                    "format": "CSV",
+                                    "content_type": "text/csv",
+                                    "size_bytes": 14,
                                     "original_rows": 20,
                                     "cleaned_rows": 20,
                                     "original_columns": 4,
@@ -334,7 +343,7 @@ public class PythonCleaningClientTest
                         content().json(
                                 """
                                 {
-                                  "dataset_id": "11111111-1111-1111-1111-111111111111",
+                                  "dataset_version_id": "11111111-1111-1111-1111-111111111111",
                                   "dataset_path": "C:\\\\temp\\\\dataset.csv",
                                   "operations": [
                                     {
@@ -351,9 +360,12 @@ public class PythonCleaningClientTest
                         withSuccess(
                                 """
                                 {
-                                  "content": "dGVzdA==",
-                                  "content_hash": "test-hash",
+                                  "artifact_id": "33333333-3333-3333-3333-333333333333",
+                                  "sha256": "test-hash",
                                   "extension": "csv",
+                                  "format": "CSV",
+                                  "content_type": "text/csv",
+                                  "size_bytes": 4,
                                   "original_rows": 1,
                                   "cleaned_rows": 1,
                                   "original_columns": 2,
@@ -373,6 +385,21 @@ public class PythonCleaningClientTest
                 "csv"
         );
 
+        mockServer.verify();
+    }
+
+    @Test
+    void shouldDownloadArtifactBytesSeparatelyFromMetadata()
+    {
+        String artifactId = "11111111-1111-1111-1111-111111111111";
+        byte[] content = "name,age\nA,22\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        mockServer.expect(requestTo(
+                        "http://localhost:8000/internal/artifacts/" + artifactId
+                ))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(content, MediaType.parseMediaType("text/csv")));
+
+        assertArrayEquals(content, pythonCleaningClient.downloadArtifact(artifactId));
         mockServer.verify();
     }
 }

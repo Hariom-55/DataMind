@@ -40,17 +40,21 @@ async function waitForAnalysisJob(
 }
 
 async function runAnalysis({
-  datasetId,
-  datasetVersionId = null,
+  logicalDatasetId,
+  datasetVersionId,
   analysisType,
   targetColumn = null,
+  enableHyperparameterTuning = false,
+  hypothesisTests = [],
   options = {},
 }) {
   const job = await createAnalysisJob({
-    datasetId,
+    logicalDatasetId,
     datasetVersionId,
     analysisType,
     targetColumn,
+    enableHyperparameterTuning,
+    hypothesisTests,
   });
 
   const completedJob = await waitForAnalysisJob(job.id, options);

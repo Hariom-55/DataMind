@@ -1,6 +1,7 @@
 import BarVisualization from "./visualizations/BarVisualization";
 import HeatmapVisualization from "./visualizations/HeatmapVisualization";
 import TableVisualization from "./visualizations/TableVisualization";
+import BoxPlotVisualization from "./visualizations/BoxPlotVisualization";
 import { ResponsiveContainer, LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
 
 function GenericChart({ visualization }) {
@@ -15,6 +16,17 @@ function GenericChart({ visualization }) {
         <span>The visualization specification did not contain renderable rows.</span>
       </div>
     );
+  }
+
+  const rowsAreObjects = data.every((row) => row && typeof row === "object" && !Array.isArray(row));
+  const valueKey = visualization.type === "SCATTER" ? y : y;
+  const hasValidAxes = typeof x === "string" && typeof y === "string"
+    && rowsAreObjects
+    && data.every((row) => Object.hasOwn(row, x) && Object.hasOwn(row, valueKey)
+      && typeof row[valueKey] === "number" && Number.isFinite(row[valueKey])
+      && (visualization.type !== "SCATTER" || (typeof row[x] === "number" && Number.isFinite(row[x]))));
+  if (!hasValidAxes) {
+    return <div className="empty-state" role="alert"><strong>Invalid {visualization.type.toLowerCase()} chart data</strong><span>Chart rows must contain the configured axes and finite numeric values.</span></div>;
   }
 
   switch (visualization.type) {
@@ -73,8 +85,6 @@ function GenericChart({ visualization }) {
           </ResponsiveContainer>
         </div>
       );
-    case "BOX_PLOT":
-      return <TableVisualization visualization={visualization} />;
     default:
       return null;
   }
@@ -90,11 +100,12 @@ function VisualizationRenderer({ visualization }) {
       return <HeatmapVisualization visualization={visualization} />;
     case "TABLE":
       return <TableVisualization visualization={visualization} />;
+    case "BOX_PLOT":
+      return <BoxPlotVisualization visualization={visualization} />;
     case "LINE":
     case "SCATTER":
     case "HISTOGRAM":
     case "PIE":
-    case "BOX_PLOT":
       return <GenericChart visualization={visualization} />;
     default:
       return (

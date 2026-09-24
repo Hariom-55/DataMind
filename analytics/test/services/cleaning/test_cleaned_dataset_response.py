@@ -1,13 +1,13 @@
-import base64
 import pandas as pd
 
 from app.schemas.cleaned_dataset_result import CleanedDatasetResult
 from app.services.cleaning.cleaned_dataset_response_service import CleanedDatasetResponseService
+from app.services.cleaning.cleaning_artifact_store import CleaningArtifactStore
 
 
 class TestCleanedDatasetResponseService:
 
-    def test_should_encode_content_as_base64(self):
+    def test_should_return_artifact_reference_instead_of_content(self, tmp_path):
 
         content = b"name,age\nHariom,22\n"
 
@@ -23,18 +23,16 @@ class TestCleanedDatasetResponseService:
             changes=[]
         )
 
-        service = CleanedDatasetResponseService()
+        service = CleanedDatasetResponseService(CleaningArtifactStore(tmp_path))
 
         response = service.build_response(result)
 
-        expected = base64.b64encode(
-            content
-        ).decode("utf-8")
-
-        assert response.content == expected
+        assert response.artifact_id
+        assert response.size_bytes == len(content)
+        assert (tmp_path / f"{response.artifact_id}.csv").read_bytes() == content
 
 
-    def test_should_preserve_result_metadata(self):
+    def test_should_preserve_result_metadata(self, tmp_path):
 
         result = CleanedDatasetResult(
             content=b"name\nHariom\n",
@@ -53,12 +51,14 @@ class TestCleanedDatasetResponseService:
             ]
         )
 
-        service = CleanedDatasetResponseService()
+        service = CleanedDatasetResponseService(CleaningArtifactStore(tmp_path))
 
         response = service.build_response(result)
 
-        assert response.content_hash == "abc123"
+        assert response.sha256 == "abc123"
         assert response.extension == "csv"
+        assert response.format == "CSV"
+        assert response.content_type == "text/csv"
 
         assert response.original_rows == 10
         assert response.cleaned_rows == 8
@@ -70,7 +70,7 @@ class TestCleanedDatasetResponseService:
         assert response.changes == result.changes
 
 
-    def test_should_produce_decodable_base64_content(self):
+    def test_should_store_raw_csv_bytes_for_download(self, tmp_path):
 
         content = b"name,age\nHariom,22\n"
 
@@ -86,12 +86,8 @@ class TestCleanedDatasetResponseService:
             changes=[]
         )
 
-        service = CleanedDatasetResponseService()
+        service = CleanedDatasetResponseService(CleaningArtifactStore(tmp_path))
 
         response = service.build_response(result)
 
-        decoded_content = base64.b64decode(
-            response.content
-        )
-
-        assert decoded_content == content
+        assert (tmp_path / f"{response.artifact_id}.csv").read_bytes() == content

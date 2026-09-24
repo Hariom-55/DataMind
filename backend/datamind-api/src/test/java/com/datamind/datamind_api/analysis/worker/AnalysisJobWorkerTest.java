@@ -99,7 +99,8 @@ class AnalysisJobWorkerTest
                 "EDA",
                 "./data/test.csv",
                 "text/csv",
-                null
+                null,
+                false
         )).thenReturn(pythonResponse);
 
         when(pythonResponse.getStatus())
@@ -120,7 +121,8 @@ class AnalysisJobWorkerTest
                         "EDA",
                         "./data/test.csv",
                         "text/csv",
-                        null
+                        null,
+                        false
                 );
 
         verify(analysisExecutionService)
@@ -169,7 +171,8 @@ class AnalysisJobWorkerTest
                 "EDA",
                 "./data/test.csv",
                 "text/csv",
-                null
+                null,
+                false
         )).thenReturn(pythonResponse);
 
         when(pythonResponse.getStatus())
@@ -225,7 +228,8 @@ class AnalysisJobWorkerTest
                 anyString(),
                 anyString(),
                 any(),
-                any()
+                any(),
+                anyBoolean()
         )).thenReturn(pythonResponse);
 
         when(pythonResponse.getStatus())
@@ -289,7 +293,8 @@ class AnalysisJobWorkerTest
                 anyString(),
                 anyString(),
                 any(),
-                any()
+                any(),
+                anyBoolean()
         )).thenThrow(exception);
 
         analysisJobWorker.processPendingJob();
@@ -364,7 +369,8 @@ class AnalysisJobWorkerTest
                 "INSIGHT",
                 "./data/test.csv",
                 "text/csv",
-                null
+                null,
+                false
         )).thenReturn(pythonResponse);
 
         when(pythonResponse.getStatus())
@@ -385,7 +391,8 @@ class AnalysisJobWorkerTest
                         "INSIGHT",
                         "./data/test.csv",
                         "text/csv",
-                        null
+                        null,
+                        false
                 );
 
         verify(analysisExecutionService)

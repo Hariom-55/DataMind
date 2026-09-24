@@ -7,6 +7,10 @@ function TableVisualization({ visualization }) {
     return <p>No data available for this visualization.</p>;
   }
 
+  if (!data.every((row) => row && typeof row === "object" && !Array.isArray(row))) {
+    return <div className="empty-state" role="alert"><strong>Invalid table data</strong><span>Each row must be an object with named columns.</span></div>;
+  }
+
   const columns = Object.keys(data[0]);
 
   return (

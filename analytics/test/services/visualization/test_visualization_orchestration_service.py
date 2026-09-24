@@ -7,6 +7,8 @@ import pytest
 from app.services.visualization.visualization_orchestration_service import (
     VisualizationOrchestrationService,
 )
+from app.services.visualization.visualization_spec import VisualizationSpec
+from app.services.visualization.visualization_types import VisualizationType
 
 
 class TestVisualizationOrchestrationService:
@@ -53,6 +55,25 @@ class TestVisualizationOrchestrationService:
         self.eda_generator.generate.assert_called_once_with(
             analysis_results["eda"]
         )
+
+    def test_should_cap_long_visual_series_with_even_sampling(self):
+        spec = VisualizationSpec(
+            type=VisualizationType.LINE,
+            title="Large series",
+            data=[{"x": index, "y": index} for index in range(10_000)],
+            x="x",
+            y="y",
+        ).to_dict()
+
+        assert len(spec["data"]) == 500
+        assert spec["data"][0]["x"] == 0
+        assert spec["data"][-1]["x"] == 9_999
+        assert spec["metadata"]["payloadLimit"] == {
+            "maxPoints": 500,
+            "totalPoints": 10_000,
+            "returnedPoints": 500,
+            "sampling": "evenly_spaced",
+        }
 
     def test_should_generate_statistical_visualizations(self):
         self.statistical_generator.generate.return_value = [

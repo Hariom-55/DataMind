@@ -45,14 +45,20 @@ public class AnalysisJobWorker {
                 : job.getDataset();
 
         try {
-            PythonAnalysisResponse response = pythonAnalysisClient.analyze(
-                    job.getId(),
-                    version.getId(),
-                    job.getAnalysisType().toString(),
-                    version.getStoragePath(),
-                    version.getFileType(),
-                    job.getTargetColumn()
-            );
+            PythonAnalysisResponse response;
+            if (job.getHypothesisTests() == null || job.getHypothesisTests().isEmpty()) {
+                response = pythonAnalysisClient.analyze(
+                        job.getId(), version.getId(), job.getAnalysisType().toString(),
+                        version.getStoragePath(), version.getFileType(), job.getTargetColumn(),
+                        job.isEnableHyperparameterTuning()
+                );
+            } else {
+                response = pythonAnalysisClient.analyze(
+                        job.getId(), version.getId(), job.getAnalysisType().toString(),
+                        version.getStoragePath(), version.getFileType(), job.getTargetColumn(),
+                        job.isEnableHyperparameterTuning(), job.getHypothesisTests()
+                );
+            }
 
             if ("COMPLETED".equals(response.getStatus())
                     && response.getError() == null

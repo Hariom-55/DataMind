@@ -1,6 +1,6 @@
 import { uploadDataset } from "../api/datasetApi";
 
-async function uploadDatasetFile(file, datasetId = null) {
+async function uploadDatasetFile(file, logicalDatasetId = null) {
   if (!(file instanceof File)) {
     throw new Error("A valid file is required.");
   }
@@ -9,8 +9,8 @@ async function uploadDatasetFile(file, datasetId = null) {
     throw new Error("The selected file is empty.");
   }
 
-  return datasetId
-    ? uploadDataset(file, datasetId)
+  return logicalDatasetId
+    ? uploadDataset(file, logicalDatasetId)
     : uploadDataset(file);
 }
 

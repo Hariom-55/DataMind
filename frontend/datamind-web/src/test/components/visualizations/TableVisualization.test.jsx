@@ -104,4 +104,10 @@ describe("TableVisualization", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it("rejects rows that are not objects", () => {
+    render(<TableVisualization visualization={{ data: [null] }} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Invalid table data");
+  });
 });

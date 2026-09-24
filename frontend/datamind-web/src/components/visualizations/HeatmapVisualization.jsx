@@ -20,6 +20,12 @@ function HeatmapVisualization({ visualization }) {
   if (data.length === 0 || columns.length === 0) {
     return <p>No data available for this visualization.</p>;
   }
+  const valid = columns.every((column) => typeof column === "string")
+    && data.every((row) => row && typeof row === "object" && !Array.isArray(row)
+      && typeof row.row === "string");
+  if (!valid) {
+    return <div className="empty-state" role="alert"><strong>Invalid heatmap data</strong><span>Rows need a text label and the visualization needs named columns.</span></div>;
+  }
 
   return (
     <div className="heatmap-container">

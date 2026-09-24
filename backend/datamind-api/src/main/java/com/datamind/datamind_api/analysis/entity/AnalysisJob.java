@@ -4,9 +4,13 @@ import com.datamind.datamind_api.analysis.entity.enums.AnalysisJobStatus;
 import com.datamind.datamind_api.analysis.entity.enums.AnalysisType;
 import com.datamind.datamind_api.dataset.entity.Dataset;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(name = "analysis_jobs")
@@ -47,6 +51,13 @@ public class AnalysisJob {
     @Column(name = "target_column")
     private String targetColumn;
 
+    @Column(name = "enable_hyperparameter_tuning", nullable = false)
+    private boolean enableHyperparameterTuning;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "hypothesis_tests", columnDefinition = "jsonb", nullable = false)
+    private List<Map<String, Object>> hypothesisTests = List.of();
+
     public AnalysisJob() {}
 
     public AnalysisJob(
@@ -82,12 +93,20 @@ public class AnalysisJob {
     public Integer getRetryCount() { return retryCount; }
     public String getErrorMessage() { return errorMessage; }
     public String getTargetColumn() { return targetColumn; }
+    public boolean isEnableHyperparameterTuning() { return enableHyperparameterTuning; }
+    public List<Map<String, Object>> getHypothesisTests() { return hypothesisTests; }
 
     public void setStartedAt(LocalDateTime startedAt) { this.startedAt = startedAt; }
     public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
     public void setStatus(AnalysisJobStatus status) { this.status = status; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public void setTargetColumn(String targetColumn) { this.targetColumn = targetColumn; }
+    public void setEnableHyperparameterTuning(boolean enableHyperparameterTuning) {
+        this.enableHyperparameterTuning = enableHyperparameterTuning;
+    }
+    public void setHypothesisTests(List<Map<String, Object>> hypothesisTests) {
+        this.hypothesisTests = hypothesisTests == null ? List.of() : List.copyOf(hypothesisTests);
+    }
     public void setDatasetVersion(Dataset datasetVersion) { this.datasetVersion = datasetVersion; }
 
     public void markAsProcessing() {

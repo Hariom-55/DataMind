@@ -1,13 +1,13 @@
 import pandas as pd
 
-from app.services.cleaning.cleaning_service import DataCleaningService
+from app.services.profiling.data_quality_service import DataQualityService
 
 
 class TestDataCleaningService:
 
     def setup_method(self):
 
-        self.service = DataCleaningService()
+        self.service = DataQualityService()
 
 
     def test_should_detect_missing_values(self):

@@ -3,8 +3,21 @@ import pandas as pd
 from app.services.machine_learning.ml_analysis_service import MLAnalysisService
 from app.loaders.dataset_loader import DatasetLoader
 from app.models.ml_problem_type import MLProblemType
+from app.schemas.analysis_request import AnalysisRequest
+from app.models.analysis_type import AnalysisType
+from uuid import uuid4
 
 class TestMLAnalysisService:
+
+    def test_hyperparameter_tuning_request_defaults_to_disabled(self):
+        request = AnalysisRequest(
+            jobId=uuid4(),
+            datasetVersionId=uuid4(),
+            analysisType=AnalysisType.MACHINE_LEARNING,
+            datasetPath="dataset.csv",
+        )
+
+        assert request.enableHyperparameterTuning is False
 
     def setup_method(self):
         dataset_loader = DatasetLoader()
@@ -535,6 +548,25 @@ class TestMLAnalysisService:
             for item in feature_importance
         )
 
+    def test_build_cv_uses_problem_specific_strategies(self):
+        from sklearn.model_selection import KFold, StratifiedKFold
+
+        classification_cv = self.service._build_cv(
+            pd.Series(["A", "A", "B", "B", "A", "B"]),
+            MLProblemType.CLASSIFICATION,
+        )
+        regression_cv = self.service._build_cv(
+            pd.Series([1, 2, 3, 4, 5, 6]),
+            MLProblemType.REGRESSION,
+        )
+
+        assert isinstance(classification_cv, StratifiedKFold)
+        assert classification_cv.n_splits == 3
+        assert classification_cv.random_state == 42
+        assert isinstance(regression_cv, KFold)
+        assert regression_cv.n_splits == 5
+        assert regression_cv.random_state == 42
+
     def test_compare_classification_models(self):
 
         X = pd.DataFrame({
@@ -700,7 +732,8 @@ class TestMLAnalysisService:
         result = self.service._train_model(
             df=df,
             target_column="target",
-            problem_type=MLProblemType.CLASSIFICATION
+            problem_type=MLProblemType.CLASSIFICATION,
+            enable_hyperparameter_tuning=True,
         )
 
         assert result["model"] in (
@@ -753,7 +786,8 @@ class TestMLAnalysisService:
         result = self.service._train_model(
             df=df,
             target_column="target",
-            problem_type=MLProblemType.REGRESSION
+            problem_type=MLProblemType.REGRESSION,
+            enable_hyperparameter_tuning=True,
         )
 
         assert result["model"] in (
@@ -781,6 +815,58 @@ class TestMLAnalysisService:
 
             assert result["tuning"]["bestScore"] >= 0
 
+    def test_tuned_estimator_is_not_fitted_again(self, monkeypatch):
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.pipeline import Pipeline
+
+        df = pd.DataFrame({
+            "feature": list(range(10)),
+            "target": ["A"] * 5 + ["B"] * 5,
+        })
+        X = df.drop(columns=["target"])
+        y = df["target"]
+        pipeline = Pipeline([
+            ("preprocessor", self.service._build_preprocessor(X)),
+            ("model", RandomForestClassifier(n_estimators=5, random_state=42)),
+        ])
+        pipeline.fit(X, y)
+        original_fit = pipeline.fit
+        fit_calls = 0
+
+        def track_fit(features, target):
+            nonlocal fit_calls
+            fit_calls += 1
+            return original_fit(features, target)
+
+        pipeline.fit = track_fit
+        monkeypatch.setattr(
+            self.service,
+            "_compare_models",
+            lambda *args: {"RandomForestClassifier": {
+                "meanScore": 1.0,
+                "standardDeviation": 0.0,
+            }},
+        )
+        monkeypatch.setattr(
+            self.service,
+            "_tune_random_forest",
+            lambda *args: {
+                "bestEstimator": pipeline,
+                "bestParameters": {},
+                "bestScore": 1.0,
+            },
+        )
+
+        result = self.service._train_model(
+            df=df,
+            target_column="target",
+            problem_type=MLProblemType.CLASSIFICATION,
+            enable_hyperparameter_tuning=True,
+        )
+
+        assert fit_calls == 0
+        assert result["featureImportance"]
+
     def test_non_random_forest_model_has_no_tuning_result(self):
         df = pd.DataFrame({
             "feature_1": [1, 2, 3, 4, 5, 6, 7, 8],
@@ -796,6 +882,33 @@ class TestMLAnalysisService:
 
         if result["model"] == "LinearRegression":
             assert result["tuning"] is None
+
+    def test_hyperparameter_tuning_is_disabled_by_default(self, monkeypatch):
+        df = pd.DataFrame({
+            "feature": list(range(10)),
+            "target": ["A"] * 5 + ["B"] * 5,
+        })
+        monkeypatch.setattr(
+            self.service,
+            "_compare_models",
+            lambda *args: {"RandomForestClassifier": {
+                "meanScore": 1.0,
+                "standardDeviation": 0.0,
+            }},
+        )
+        monkeypatch.setattr(
+            self.service,
+            "_tune_random_forest",
+            lambda *args: pytest.fail("tuning should be opt-in"),
+        )
+
+        result = self.service._train_model(
+            df=df,
+            target_column="target",
+            problem_type=MLProblemType.CLASSIFICATION,
+        )
+
+        assert result["tuning"] is None
 
 
     def test_random_forest_tuning_returns_expected_parameters(self):
@@ -910,3 +1023,39 @@ class TestMLAnalysisService:
             
 
 
+
+
+def test_ml_analysis_persists_feature_selection_and_artifact_metadata(tmp_path):
+    from app.services.machine_learning.ml_artifact_store import MLArtifactStore
+
+    dataset_path = tmp_path / "artifact-test.csv"
+    dataset_path.write_text(
+        "customer_id,age,income,target\n"
+        "1,20,20000,0\n"
+        "2,25,30000,0\n"
+        "3,30,40000,1\n"
+        "4,35,50000,1\n"
+        "5,40,60000,1\n"
+        "6,45,70000,1\n"
+        "7,50,80000,0\n"
+        "8,55,90000,1\n"
+    )
+
+    service = MLAnalysisService(
+        DatasetLoader(),
+        artifact_store=MLArtifactStore(tmp_path / "artifacts"),
+    )
+    result = service.analyze(
+        str(dataset_path),
+        "text/csv",
+        "target",
+        job_id="job-feature-selection",
+    )
+
+    training = result["training"]
+    assert "featureSelection" in training
+    assert "selectedFeatures" in training["featureSelection"]
+    assert "removedFeatures" in training["featureSelection"]
+    assert "artifacts" in training
+    assert training["artifacts"]["runId"] == "job-feature-selection"
+    assert training["artifacts"]["artifactErrors"] == {}

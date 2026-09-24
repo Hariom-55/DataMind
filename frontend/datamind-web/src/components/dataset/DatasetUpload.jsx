@@ -60,7 +60,7 @@ function DatasetUpload({ onUploadSuccess }) {
 
       {status === "SUCCESS" && dataset && (
         <p role="status">
-          Dataset uploaded successfully. ID: {dataset.id}
+          Dataset version v{dataset.versionNumber ?? 1} uploaded successfully.
         </p>
       )}
 

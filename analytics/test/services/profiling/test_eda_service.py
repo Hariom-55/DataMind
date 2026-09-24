@@ -158,6 +158,24 @@ class TestEDAService:
             "rare": 1,
         }
 
+    def test_should_cap_histogram_bins_and_rare_value_previews(self, tmp_path):
+        dataset = pd.DataFrame({
+            "value": list(range(5000)),
+            "category": [f"unique-{index}" for index in range(5000)],
+        })
+        file_path = tmp_path / "bounded_payload.csv"
+        dataset.to_csv(file_path, index=False)
+
+        result = self.service.analyze(str(file_path))
+
+        bins = result["numericHistograms"]["value"]
+        rare = result["categoricalStatistics"]["category"]
+        assert len(bins) <= 100
+        assert sum(item["count"] for item in bins) == 5000
+        assert len(rare["rareValues"]) == 20
+        assert rare["rareValueCount"] == 5000
+        assert rare["rareValuesTruncated"] is True
+
     def test_should_report_constant_and_high_cardinality_columns(self, tmp_path):
         dataset = pd.DataFrame({
             "constant": ["same"] * 40,

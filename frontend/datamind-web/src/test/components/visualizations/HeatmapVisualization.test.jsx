@@ -96,4 +96,10 @@ describe("HeatmapVisualization", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it("reports malformed heatmap rows", () => {
+    render(<HeatmapVisualization visualization={{ data: [{ age: 0.5 }], metadata: { columns: ["age"] } }} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Invalid heatmap data");
+  });
 });

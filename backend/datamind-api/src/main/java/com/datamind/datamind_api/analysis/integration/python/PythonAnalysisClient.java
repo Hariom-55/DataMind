@@ -8,6 +8,8 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.util.UUID;
+import java.util.List;
+import java.util.Map;
 
 @Component
 public class PythonAnalysisClient {
@@ -20,24 +22,51 @@ public class PythonAnalysisClient {
 
     public PythonAnalysisResponse analyze(
             UUID jobId,
-            UUID datasetId,
+            UUID datasetVersionId,
             String analysisType,
             String datasetPath,
             String fileType
     ) {
-        return analyze(jobId, datasetId, analysisType, datasetPath, fileType, null);
+        return analyze(jobId, datasetVersionId, analysisType, datasetPath, fileType, null);
     }
 
     public PythonAnalysisResponse analyze(
             UUID jobId,
-            UUID datasetId,
+            UUID datasetVersionId,
             String analysisType,
             String datasetPath,
             String fileType,
             String targetColumn
     ) {
+        return analyze(jobId, datasetVersionId, analysisType, datasetPath, fileType, targetColumn, false);
+    }
+
+    public PythonAnalysisResponse analyze(
+            UUID jobId,
+            UUID datasetVersionId,
+            String analysisType,
+            String datasetPath,
+            String fileType,
+            String targetColumn,
+            boolean enableHyperparameterTuning
+    ) {
+        return analyze(jobId, datasetVersionId, analysisType, datasetPath, fileType,
+                targetColumn, enableHyperparameterTuning, List.of());
+    }
+
+    public PythonAnalysisResponse analyze(
+            UUID jobId,
+            UUID datasetVersionId,
+            String analysisType,
+            String datasetPath,
+            String fileType,
+            String targetColumn,
+            boolean enableHyperparameterTuning,
+            List<Map<String, Object>> hypothesisTests
+    ) {
         PythonAnalysisRequest request = new PythonAnalysisRequest(
-                jobId, datasetId, analysisType, datasetPath, fileType, targetColumn
+                jobId, datasetVersionId, analysisType, datasetPath, fileType, targetColumn,
+                enableHyperparameterTuning, hypothesisTests
         );
 
         try {

@@ -5,6 +5,7 @@ import com.datamind.datamind_api.analysis.entity.enums.AnalysisJobStatus;
 import com.datamind.datamind_api.analysis.entity.enums.AnalysisType;
 import com.datamind.datamind_api.analysis.exception.AnalysisJobNotFoundException;
 import com.datamind.datamind_api.analysis.repository.AnalysisJobRepository;
+import org.springframework.data.domain.PageRequest;
 import com.datamind.datamind_api.dataset.entity.Dataset;
 import com.datamind.datamind_api.dataset.service.DatasetService;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +16,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -43,25 +45,53 @@ public class AnalysisJobService {
             AnalysisType analysisType,
             String targetColumn
     ) {
+        return createAnalysisJob(datasetId, datasetVersionId, analysisType, targetColumn, false);
+    }
+
+    @Transactional
+    public AnalysisJob createAnalysisJob(
+            UUID datasetId,
+            UUID datasetVersionId,
+            AnalysisType analysisType,
+            String targetColumn,
+            boolean enableHyperparameterTuning
+    ) {
+        return createAnalysisJob(datasetId, datasetVersionId, analysisType, targetColumn,
+                enableHyperparameterTuning, List.of());
+    }
+
+    @Transactional
+    public AnalysisJob createAnalysisJob(
+            UUID datasetId,
+            UUID datasetVersionId,
+            AnalysisType analysisType,
+            String targetColumn,
+            boolean enableHyperparameterTuning,
+            List<java.util.Map<String, Object>> hypothesisTests
+    ) {
         validateAnalysisRequest(analysisType, targetColumn);
+        if (analysisType != AnalysisType.STATISTICAL
+                && hypothesisTests != null && !hypothesisTests.isEmpty()) {
+            throw new IllegalArgumentException("hypothesisTests are only supported for STATISTICAL analysis");
+        }
+        if (hypothesisTests != null && hypothesisTests.size() > 10) {
+            throw new IllegalArgumentException("At most 10 hypothesis tests may be requested");
+        }
 
         Dataset logicalOrVersion = datasetService.getDatasetById(datasetId);
 
-        Dataset version;
-        if (datasetVersionId != null) {
-            version = datasetService.getDatasetById(datasetVersionId);
-            if (logicalOrVersion.getLogicalDatasetId() != null
-                    && version.getLogicalDatasetId() != null
-                    && !logicalOrVersion.getLogicalDatasetId().equals(version.getLogicalDatasetId())) {
-                throw new IllegalArgumentException(
-                        "datasetVersionId does not belong to datasetId"
-                );
-            }
-        } else {
-            UUID logicalId = logicalOrVersion.getLogicalDatasetId() != null
-                    ? logicalOrVersion.getLogicalDatasetId()
-                    : logicalOrVersion.getId();
-            version = datasetService.getCurrentVersion(logicalId);
+        if (datasetVersionId == null) {
+            throw new IllegalArgumentException("datasetVersionId is required");
+        }
+        Dataset version = datasetService.getDatasetById(datasetVersionId);
+        UUID logicalId = logicalOrVersion.getLogicalDatasetId() != null
+                ? logicalOrVersion.getLogicalDatasetId()
+                : (logicalOrVersion.getId() != null ? logicalOrVersion.getId() : datasetId);
+        if (version.getLogicalDatasetId() == null
+                || !logicalId.equals(version.getLogicalDatasetId())) {
+            throw new IllegalArgumentException(
+                    "datasetVersionId does not belong to logicalDatasetId"
+            );
         }
 
         AnalysisJob job = new AnalysisJob(
@@ -71,6 +101,8 @@ public class AnalysisJobService {
                 AnalysisJobStatus.PENDING
         );
         job.setTargetColumn(StringUtils.hasText(targetColumn) ? targetColumn.trim() : null);
+        job.setEnableHyperparameterTuning(enableHyperparameterTuning);
+        job.setHypothesisTests(hypothesisTests);
         return analysisJobRepository.save(job);
     }
 
@@ -79,15 +111,54 @@ public class AnalysisJobService {
             AnalysisType analysisType,
             String targetColumn
     ) {
-        return createAnalysisJob(datasetId, null, analysisType, targetColumn);
+        validateAnalysisRequest(analysisType, targetColumn);
+        Dataset dataset = datasetService.getDatasetById(datasetId);
+        UUID logicalId = dataset.getLogicalDatasetId() != null
+                ? dataset.getLogicalDatasetId()
+                : (dataset.getId() != null ? dataset.getId() : datasetId);
+        Dataset currentVersion = datasetService.getCurrentVersion(logicalId);
+        if (currentVersion == null) {
+            currentVersion = dataset;
+        }
+        UUID versionId = currentVersion.getId() != null
+                ? currentVersion.getId()
+                : datasetId;
+        return createAnalysisJob(logicalId, versionId, analysisType, targetColumn);
     }
 
     private void validateAnalysisRequest(AnalysisType analysisType, String targetColumn) {
         if (analysisType == null) {
             throw new IllegalArgumentException("analysisType is required");
         }
+        if (analysisType == AnalysisType.TIME_SERIES
+                || analysisType == AnalysisType.TEXT_ANALYSIS) {
+            throw new IllegalArgumentException(
+                    "Unsupported analysis type: " + analysisType
+            );
+        }
         // A missing target selects the analytics service's unsupervised
         // KMeans/PCA workflow. A supplied target selects supervised ML.
+    }
+
+    @Transactional(readOnly = true)
+    public List<AnalysisJob> getAnalysisHistory(
+            UUID logicalDatasetId,
+            UUID datasetVersionId,
+            AnalysisType analysisType,
+            AnalysisJobStatus status,
+            int limit
+    ) {
+        if (logicalDatasetId == null) {
+            throw new IllegalArgumentException("logicalDatasetId is required");
+        }
+        int safeLimit = Math.max(1, Math.min(limit, 100));
+        return analysisJobRepository.findHistory(
+                logicalDatasetId,
+                datasetVersionId,
+                analysisType,
+                status,
+                PageRequest.of(0, safeLimit)
+        );
     }
 
     public AnalysisJob getAnalysisJobById(UUID id) {

@@ -4,6 +4,7 @@ import numpy as np
 from app.loaders.dataset_loader import DatasetLoader
 from app.core.analysis_service import AnalysisService
 from app.services.profiling.data_quality_service import DataQualityService
+from app.services.visualization.visualization_limits import MAX_HISTOGRAM_BINS, MAX_RARE_VALUES
 
 
 class EDAService(AnalysisService):
@@ -88,6 +89,11 @@ class EDAService(AnalysisService):
         for column in categorical_df.columns:
             all_value_counts = df[column].value_counts(dropna=False)
             value_counts = all_value_counts.head(10)
+            rare_items = [
+                (value, count)
+                for value, count in all_value_counts.items()
+                if count == 1 and pd.notna(value)
+            ]
             top_values = {
                 str(value): int(count)
                 for value, count in value_counts.items()
@@ -97,9 +103,10 @@ class EDAService(AnalysisService):
                 "topValues": top_values,
                 "rareValues": {
                     str(value): int(count)
-                    for value, count in all_value_counts.items()
-                    if count == 1 and pd.notna(value)
+                    for value, count in rare_items[:MAX_RARE_VALUES]
                 },
+                "rareValueCount": len(rare_items),
+                "rareValuesTruncated": len(rare_items) > MAX_RARE_VALUES,
                 "missingCount": int(df[column].isna().sum()),
                 "cardinalityRatio": (
                     float(round(df[column].nunique(dropna=True) / row_count, 4))
@@ -162,7 +169,8 @@ class EDAService(AnalysisService):
             if len(series) < 2 or float(series.min()) == float(series.max()):
                 continue
 
-            counts, edges = np.histogram(series.to_numpy(), bins="auto")
+            bin_count = min(MAX_HISTOGRAM_BINS, max(1, int(np.ceil(np.sqrt(len(series))))))
+            counts, edges = np.histogram(series.to_numpy(), bins=bin_count)
             bins = []
             for index, count in enumerate(counts):
                 bins.append({

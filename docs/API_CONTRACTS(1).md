@@ -67,7 +67,12 @@ detection.
 
 ``` json
 {
-  "id": "UUID",
+  "logicalDatasetId": "UUID",
+  "datasetVersionId": "UUID",
+  "versionNumber": 1,
+  "currentVersionId": "UUID",
+  "id": "UUID (compatibility alias for logicalDatasetId)",
+  "versionId": "UUID (deprecated alias for datasetVersionId)",
   "name": "dataset.csv",
   "contentHash": "SHA-256 hash",
   "fileSize": 12345,
@@ -80,9 +85,14 @@ detection.
 
 Fields:
 
-  Field           Type                 Description
-  --------------- -------------------- ----------------------------
-  `id`            UUID                 Dataset identifier
+  Field                 Type                 Description
+  --------------------- -------------------- ----------------------------
+  `logicalDatasetId`    UUID                 Stable identity for the dataset family
+  `datasetVersionId`    UUID                 Identity for this exact version
+  `versionNumber`       Integer              Version sequence within the family
+  `currentVersionId`    UUID/null            Current version identity
+  `id`                  UUID                 Deprecated logicalDatasetId alias
+  `versionId`           UUID                 Deprecated datasetVersionId alias
   `name`          String               Original dataset name
   `contentHash`   String               Content fingerprint
   `fileSize`      Long                 File size
@@ -108,8 +118,10 @@ FAILED
 
 ``` json
 {
-  "datasetId": "UUID",
-  "parentDatasetId": "UUID",
+  "datasetVersionId": "UUID",
+  "parentDatasetVersionId": "UUID",
+  "datasetId": "UUID (deprecated alias for datasetVersionId)",
+  "parentDatasetId": "UUID (deprecated alias for parentDatasetVersionId)",
   "operation": "remove_missing_values",
   "columnName": "Age",
   "rowsAffected": 177,
@@ -122,8 +134,10 @@ Fields:
 
   Field               Type
   ------------------- ---------------
-  `datasetId`         UUID
-  `parentDatasetId`   UUID
+  `datasetVersionId`         UUID  Child version identity
+  `parentDatasetVersionId`   UUID  Parent version identity
+  `datasetId`                UUID  Deprecated alias for datasetVersionId
+  `parentDatasetId`          UUID  Deprecated alias for parentDatasetVersionId
   `operation`         String
   `columnName`        String/null
   `rowsAffected`      Integer/null
@@ -138,44 +152,58 @@ Fields:
 
 ``` json
 {
-  "datasetId": "UUID",
+  "logicalDatasetId": "UUID",
+  "datasetVersionId": "UUID",
   "analysisType": "EDA",
-  "targetColumn": null
+  "targetColumn": null,
+  "enableHyperparameterTuning": false,
+  "hypothesisTests": []
 }
 ```
 
 Fields:
 
-  Field            Type           Required
-  ---------------- -------------- ----------
-  `datasetId`      UUID           Yes
-  `analysisType`   AnalysisType   Yes
-  `targetColumn`   String         No
+  Field               Type           Required
+  ------------------- -------------- ----------
+  `logicalDatasetId`  UUID           Yes
+  `datasetVersionId`  UUID           Yes
+  `analysisType`      AnalysisType   Yes
+  `targetColumn`      String         No
+  `enableHyperparameterTuning` Boolean No (defaults to false)
+  `hypothesisTests`   Array          No (STATISTICAL only; max 10)
+
+`datasetId` is accepted as a request alias for `logicalDatasetId` during
+the compatibility period. The selected version must belong to that
+logical dataset.
+Set `enableHyperparameterTuning` to `true` only to opt supervised machine
+learning into random forest grid search when a random forest model is selected.
 
 ------------------------------------------------------------------------
 
 ## 4.2 AnalysisType
 
-The Java analysis-type enum currently defines:
+The API accepts these analysis types:
 
 ``` text
 EDA
 STATISTICAL
 MACHINE_LEARNING
-TIME_SERIES
-TEXT_ANALYSIS
+INSIGHT
 ```
 
-The currently inspected Python registry registers:
+The Java enum retains `TIME_SERIES` and `TEXT_ANALYSIS` for stored data
+compatibility, but job creation rejects them with HTTP 400 until implementations
+are registered. Python's internal registry likewise returns an explicit 400 for
+those unsupported request values.
+
+The Python registry registers:
 
 ``` text
 EDA
 STATISTICAL
 MACHINE_LEARNING
+INSIGHT
 ```
-
-Therefore `TIME_SERIES` and `TEXT_ANALYSIS` are modelled as analysis
-types but are not yet connected to the inspected Python registry.
 
 ------------------------------------------------------------------------
 
@@ -184,7 +212,11 @@ types but are not yet connected to the inspected Python registry.
 ``` json
 {
   "id": "UUID",
-  "datasetId": "UUID",
+  "logicalDatasetId": "UUID",
+  "datasetVersionId": "UUID",
+  "versionNumber": 1,
+  "datasetId": "UUID (deprecated alias)",
+  "datasetVersion": 1,
   "analysisType": "EDA",
   "status": "PENDING",
   "createdAt": "2026-09-18T20:00:00",
@@ -200,7 +232,11 @@ Fields:
   Field            Type
   ---------------- --------------------
   `id`             UUID
-  `datasetId`      UUID
+  `logicalDatasetId` UUID
+  `datasetVersionId` UUID
+  `versionNumber`  Integer
+  `datasetId`      UUID (deprecated alias)
+  `datasetVersion` Integer (deprecated alias)
   `analysisType`   AnalysisType
   `status`         AnalysisJobStatus
   `createdAt`      LocalDateTime
@@ -218,6 +254,48 @@ COMPLETED
 FAILED
 ```
 
+## 4.4 Cleaning Workflow Contracts
+
+Public cleaning routes are version-pinned:
+
+```text
+GET  /api/datasets/{logicalDatasetId}/versions/{datasetVersionId}/cleaning/recommendations
+POST /api/datasets/{logicalDatasetId}/versions/{datasetVersionId}/cleaning/preview
+POST /api/datasets/{logicalDatasetId}/versions/{datasetVersionId}/cleaning
+```
+
+Preview and apply request body:
+
+```json
+{
+  "operations": [
+    { "operation": "REMOVE_DUPLICATES", "column": null, "parameters": {} }
+  ]
+}
+```
+
+Operations may carry an explicit `parameters` object. For example:
+
+```json
+{
+  "operation": "IMPUTE_MISSING_VALUES",
+  "column": "age",
+  "parameters": { "strategy": "MEDIAN" }
+}
+```
+
+Imputation strategies are `AUTO`, `MEDIAN`, `MEAN`, `MODE`, and `CONSTANT`;
+`CONSTANT` requires a `value`. `AUTO` uses the median for numeric columns and
+the mode for categorical columns. Category normalization accepts optional
+`trim` and `lowercase` booleans. Unsupported parameters are rejected.
+
+Assessment returns row/column totals, quality issues, and supported
+recommendations. Preview returns before/after dimensions and change
+details without persisting a new version. Apply returns those details,
+the newly created `dataset` response, and recorded `lineage` entries,
+including the exact `operationConfig` values applied to create the version.
+Operations are required and capped at 25 per request.
+
 ------------------------------------------------------------------------
 
 # 5. Analysis Result Contract
@@ -226,8 +304,35 @@ FAILED
 
 ``` json
 {
-  "id": "UUID",
+  "contractVersion": "v1",
   "jobId": "UUID",
+  "logicalDatasetId": "UUID",
+  "datasetVersionId": "UUID",
+  "versionNumber": 2,
+  "analysisType": "EDA",
+  "status": "COMPLETED",
+  "createdAt": "2026-09-18T20:00:00",
+  "result": {}
+}
+```
+
+The response uses this same outer envelope for every analysis type. `result`
+contains the analysis-specific payload. Legacy `id`, `datasetId`, and
+`datasetVersion` properties remain available as compatibility aliases; clients
+should use `jobId`, `logicalDatasetId`, and `versionNumber`.
+
+``` json
+{
+  "id": "UUID",
+  "datasetId": "UUID",
+  "datasetVersion": 2,
+  "jobId": "UUID",
+  "logicalDatasetId": "UUID",
+  "datasetVersionId": "UUID",
+  "versionNumber": 2,
+  "analysisType": "EDA",
+  "contractVersion": "v1",
+  "status": "COMPLETED",
   "result": {},
   "createdAt": "2026-09-18T20:00:00"
 }
@@ -235,12 +340,17 @@ FAILED
 
 Fields:
 
-  Field         Type
-  ------------- -----------------------
-  `id`          UUID
-  `jobId`       UUID
-  `result`      Map\<String, Object\>
-  `createdAt`   LocalDateTime
+  Field                  Type
+  ---------------------- -----------------------
+  `contractVersion`      String (`v1`)
+  `jobId`                UUID
+  `logicalDatasetId`     UUID
+  `datasetVersionId`     UUID
+  `versionNumber`        Integer
+  `analysisType`         AnalysisType
+  `status`               AnalysisJobStatus
+  `createdAt`            LocalDateTime
+  `result`               Map\<String, Object\>
 
 The `result` field is intentionally structured as a flexible map because
 different analysis engines produce different result schemas.
@@ -257,8 +367,21 @@ The internal analysis request contains:
 datasetPath
 fileType
 analysisType
+datasetVersionId
 targetColumn
+enableHyperparameterTuning
+hypothesisTests (optional; STATISTICAL only)
 ```
+
+Statistical jobs may include up to 10 `hypothesisTests`. Supported test kinds
+are `ONE_SAMPLE_T_TEST` (`column`, `referenceValue`), `INDEPENDENT_T_TEST`
+(`valueColumn`, `groupColumn`), `PAIRED_T_TEST` (`column1`, `column2`), and
+`CHI_SQUARE_INDEPENDENCE` (`column1`, `column2`). All accept `alpha` in the
+exclusive range `(0, 1)`, defaulting to `0.05`. Statistical assumptions and
+column types/sample sizes are checked when each test runs; invalid requests
+fail the analysis job with a validation reason. Results are returned under
+`result.hypothesisTests` with the test statistic, p-value, decision, and
+interpretation.
 
 The Python service:
 
@@ -266,6 +389,16 @@ The Python service:
 2.  resolves the analysis service from `AnalysisRegistry`;
 3.  executes the analysis;
 4.  returns a standard wrapper.
+
+The internal analysis request optionally accepts
+`enableHyperparameterTuning` (default `false`). Cleaning responses contain an
+artifact reference with format, extension, content type, SHA-256, and size
+metadata. Java retrieves bytes separately from `/internal/artifacts/{artifactId}`;
+cleaned bytes are no longer embedded as Base64 in JSON.
+The internal analysis request names the concrete file identifier
+`datasetVersionId`; `datasetId` is accepted temporarily as a compatibility
+alias. The internal cleaning request uses `dataset_version_id`, with
+`dataset_id` accepted as a legacy alias.
 
 ## Analysis response
 
@@ -356,6 +489,12 @@ TABLE
 
 The frontend renderer maps visualization types to React visualization
 components.
+
+`BOX_PLOT` uses a five-number numeric summary in `data` (`min`, `q1`,
+`median`, `q3`, `max`), with `column` as an optional label and `lowerBound` /
+`upperBound` as optional IQR fence values. The renderer displays the observed
+whiskers and quartile box and reports missing or inconsistent summaries as an
+explicit invalid-data state.
 
 ------------------------------------------------------------------------
 

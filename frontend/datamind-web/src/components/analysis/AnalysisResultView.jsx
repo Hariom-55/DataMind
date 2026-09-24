@@ -22,18 +22,11 @@ function AnalysisResultView({ result, analysisType }) {
     );
   }
 
-  const isDirectEdaResult = Boolean(
-    analysisResult.overview ||
-    analysisResult.numericStatistics ||
-    analysisResult.categoricalStatistics ||
-    analysisResult.missingValues,
-  );
   const resolvedType = String(
     analysisType ||
     result.analysisType ||
     result.job?.analysisType ||
-    analysisResult.analysisType ||
-    (analysisResult.analysis ? "INSIGHT" : isDirectEdaResult ? "EDA" : "INSIGHT"),
+    "INSIGHT",
   ).toUpperCase();
 
   return (

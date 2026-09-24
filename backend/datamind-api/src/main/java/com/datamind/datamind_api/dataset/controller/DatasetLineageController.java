@@ -20,13 +20,13 @@ public class DatasetLineageController {
         this.lineageService = lineageService;
     }
 
-    @GetMapping("/{datasetId}/lineage")
+    @GetMapping("/{datasetVersionId}/lineage")
     public ResponseEntity<List<DatasetLineageResponse>> getLineage(
-            @PathVariable UUID datasetId
+            @PathVariable UUID datasetVersionId
     ) {
 
         return ResponseEntity.ok(
-                lineageService.getLineage(datasetId)
+                lineageService.getLineage(datasetVersionId)
         );
     }
 }

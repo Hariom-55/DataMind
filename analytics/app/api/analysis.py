@@ -2,6 +2,9 @@
 from uuid import UUID
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
+from uuid import UUID
 
 from app.schemas.analysis_request import AnalysisRequest
 from app.services.profiling.eda_service import EDAService
@@ -14,8 +17,8 @@ from app.schemas.clean_dataset_request import CleanDatasetRequest
 from app.services.cleaning.dataset_cleaning_service import DatasetCleaningService
 from app.services.cleaning.cleaning_workflow_service import DataCleaningWorkflowService
 from app.services.profiling.data_quality_service import DataQualityService
-from app.services.cleaning.cleaning_service import DataCleaningService
 from app.services.cleaning.cleaned_dataset_response_service import CleanedDatasetResponseService
+from app.services.cleaning.cleaning_artifact_store import CleaningArtifactStore
 from app.services.insight.insight_engine import InsightEngine
 from app.services.insight.insight_orchestration_service import InsightOrchestrationService
 from app.services.visualization.visualization_orchestration_service import VisualizationOrchestrationService
@@ -64,11 +67,11 @@ analysis_registry.register(
 )
 
 
-# Data Cleaning service
-cleaning_service = DataCleaningService()
-cleaning_workflow_service = DataCleaningWorkflowService(cleaning_service)
+# Quality detection, recommendations, and data changes have separate owners.
+cleaning_workflow_service = DataCleaningWorkflowService(data_quality_service)
 
-cleaned_dataset_response_service = CleanedDatasetResponseService()
+cleaning_artifact_store = CleaningArtifactStore()
+cleaned_dataset_response_service = CleanedDatasetResponseService(cleaning_artifact_store)
 
 dataset_cleaning_service = DatasetCleaningService(dataset_loader, cleaning_workflow_service, cleaned_dataset_response_service)
 
@@ -90,11 +93,25 @@ def analyze(request: AnalysisRequest):
             request.analysisType.value
         )
 
-        result = service.analyze(
-            str(dataset_path),
-            request.fileType,
-            request.targetColumn
-        )
+        if request.analysisType.value == "MACHINE_LEARNING":
+            result = service.analyze(
+                str(dataset_path),
+                request.fileType,
+                request.targetColumn,
+            )
+        elif request.analysisType.value == "STATISTICAL":
+            result = service.analyze(
+                str(dataset_path),
+                request.fileType,
+                request.targetColumn,
+                request.hypothesisTests,
+            )
+        else:
+            result = service.analyze(
+                str(dataset_path),
+                request.fileType,
+                request.targetColumn
+            )
 
         # Individual analysis services return domain results directly. Add
         # visualization specs here so the specialized dashboards receive the
@@ -160,4 +177,59 @@ def clean_dataset(request: CleanDatasetRequest):
             status_code=500,
             detail=str(ex)
         )
+
+
+@router.get("/internal/artifacts/{artifact_id}")
+def download_cleaning_artifact(artifact_id: UUID):
+    artifact_path = cleaning_artifact_store.path_for(artifact_id)
+    if not artifact_path.is_file():
+        raise HTTPException(status_code=404, detail="Cleaning artifact not found")
+    return FileResponse(
+        artifact_path,
+        media_type="text/csv",
+        filename=f"{artifact_id}.csv",
+        background=BackgroundTask(cleaning_artifact_store.delete, artifact_id),
+    )
+
+
+@router.post("/internal/clean/assessment")
+def assess_cleaning(request: CleanDatasetRequest):
+    dataset_path = Path(request.dataset_path)
+
+    if not dataset_path.exists():
+        raise HTTPException(status_code=404, detail="Dataset file not found")
+
+    try:
+        df = dataset_loader.load(str(dataset_path))
+        return cleaning_workflow_service.assess_dataset(df)
+    except ValueError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=str(ex))
+
+
+@router.post("/internal/clean/preview")
+def preview_cleaning(request: CleanDatasetRequest):
+    dataset_path = Path(request.dataset_path)
+
+    if not dataset_path.exists():
+        raise HTTPException(status_code=404, detail="Dataset file not found")
+    if not request.operations:
+        raise HTTPException(status_code=400, detail="At least one cleaning operation is required")
+
+    try:
+        df = dataset_loader.load(str(dataset_path))
+        result = cleaning_workflow_service.clean_dataset(df, request.operations)
+        return {
+            "originalRows": result["originalRows"],
+            "cleanedRows": result["cleanedRows"],
+            "originalColumns": result["originalColumns"],
+            "cleanedColumns": result["cleanedColumns"],
+            "operationsApplied": result["operationsApplied"],
+            "changes": result["changes"],
+        }
+    except ValueError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=str(ex))
 

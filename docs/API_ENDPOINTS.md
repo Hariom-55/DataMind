@@ -53,6 +53,10 @@ Multipart field:
 file
 ```
 
+To append a new file as a version of an existing logical dataset, include
+the `logicalDatasetId` multipart query parameter. `datasetId` remains
+accepted as a compatibility alias.
+
 Example:
 
 ``` bash
@@ -68,12 +72,12 @@ curl -X POST http://localhost:8080/api/datasets \
 
 Response body: `DatasetResponse`
 
-### GET `/api/datasets/{id}`
+### GET `/api/datasets/{datasetVersionId}`
 
 Retrieves a dataset by UUID.
 
 ``` http
-GET /api/datasets/{id}
+GET /api/datasets/{datasetVersionId}
 ```
 
 **Success response**
@@ -108,12 +112,14 @@ List<DatasetResponse>
 
 ## 2.2 Dataset Lineage Endpoint
 
-### GET `/api/datasets/{datasetId}/lineage`
+### GET `/api/datasets/{datasetVersionId}/lineage`
 
-Retrieves lineage records associated with a dataset.
+Retrieves lineage records for a concrete dataset version. Each lineage item
+uses `datasetVersionId` and `parentDatasetVersionId`; legacy `datasetId` and
+`parentDatasetId` aliases remain deprecated during the compatibility period.
 
 ``` http
-GET /api/datasets/{datasetId}/lineage
+GET /api/datasets/{datasetVersionId}/lineage
 ```
 
 **Success response**
@@ -127,6 +133,33 @@ Response body:
 ``` text
 List<DatasetLineageResponse>
 ```
+
+## 2.3 Cleaning Workflow
+
+All cleaning routes require a logical dataset ID and a concrete dataset
+version ID. Assessment and preview are read-only; applying operations
+creates a child version and returns the new `DatasetResponse` plus lineage.
+
+```text
+GET  /api/datasets/{logicalDatasetId}/versions/{datasetVersionId}/cleaning/recommendations
+POST /api/datasets/{logicalDatasetId}/versions/{datasetVersionId}/cleaning/preview
+POST /api/datasets/{logicalDatasetId}/versions/{datasetVersionId}/cleaning
+```
+
+Preview and apply accept `{ "operations": [{ "operation": "REMOVE_DUPLICATES", "column": null, "parameters": {} }] }`.
+Imputation operations accept `parameters.strategy` values `AUTO`, `MEDIAN`,
+`MEAN`, `MODE`, or `CONSTANT` (with a required `value` for `CONSTANT`). The
+`AUTO` strategy uses median for numeric data and mode for categorical data.
+Category normalization accepts `trim` and `lowercase` booleans. The API rejects
+unsupported or malformed operation parameters.
+Operations must be selected explicitly; preview does not persist a version.
+Applying an operation returns `dataset` with the canonical version fields
+and `lineage` entries recording the operation and the exact `operationConfig`
+used to create it.
+Cleaned outputs are normalized to CSV. The response includes `format: "CSV"`,
+`extension: "csv"`, and `contentType: "text/csv"`; the returned dataset's
+`fileType` is `text/csv`, its name ends in `.csv`, and its stored file uses the
+`.csv` extension. Input datasets may use other supported formats.
 
 ------------------------------------------------------------------------
 
@@ -153,16 +186,30 @@ Example:
 
 ``` json
 {
-  "datasetId": "93e48716-70f6-468e-8c34-9efe055926eb",
+  "logicalDatasetId": "93e48716-70f6-468e-8c34-9efe055926eb",
+  "datasetVersionId": "f528134c-110c-441c-a693-a09955d07698",
   "analysisType": "EDA",
-  "targetColumn": null
+  "targetColumn": null,
+  "enableHyperparameterTuning": false,
+  "hypothesisTests": []
 }
 ```
 
-`datasetId` and `analysisType` are required.
+`logicalDatasetId`, `datasetVersionId`, and `analysisType` are required.
+The version must belong to the specified logical dataset. This pins the
+job to the exact uploaded or cleaned version even when a newer version is
+created before the job runs. `datasetId` remains accepted as a request
+alias for `logicalDatasetId`.
 
 `targetColumn` is optional and is relevant to analysis types that
 require a target.
+`enableHyperparameterTuning` is optional and defaults to `false`. Set it to
+`true` for supervised machine learning to run the random forest grid search
+when a random forest model is selected. It has no effect on other analysis
+types or targetless clustering.
+For `STATISTICAL`, optional `hypothesisTests` can request supported tests and
+parameters; see the [analysis request contract](API_CONTRACTS%281%29.md) for
+supported kinds and required columns.
 
 **Success response**
 
@@ -172,7 +219,9 @@ require a target.
 
 Response body: `AnalysisJobResponse`
 
-------------------------------------------------------------------------
+Responses expose canonical `logicalDatasetId`, `datasetVersionId`, and
+`versionNumber` fields. Older `datasetId` and `datasetVersion` aliases
+remain during migration.
 
 ## 3.2 GET `/api/analysis/jobs/{id}`
 
@@ -194,7 +243,21 @@ The frontend uses this endpoint for job-status polling.
 
 ------------------------------------------------------------------------
 
-## 3.3 GET `/api/analysis/jobs/{jobId}/result`
+## 3.3 GET `/api/analysis/jobs`
+
+List recent analysis jobs for a logical dataset. Supports optional filters
+`datasetVersionId`, `analysisType`, and `status`; `limit` defaults to 50 and is
+capped at 100.
+
+``` http
+GET /api/analysis/jobs?logicalDatasetId={logicalDatasetId}&datasetVersionId={datasetVersionId}&analysisType=EDA&status=COMPLETED&limit=50
+```
+
+Returns an array of `AnalysisJobResponse` objects ordered newest first. The
+existing `GET /api/analysis/jobs/{jobId}/result` endpoint retrieves a completed
+job's result for reopening.
+
+## 3.4 GET `/api/analysis/jobs/{jobId}/result`
 
 Retrieves the persisted analysis result for a job.
 
@@ -208,7 +271,11 @@ GET /api/analysis/jobs/{jobId}/result
 200 OK
 ```
 
-Response body: `AnalysisResultResponse`
+Response body: `AnalysisResultResponse`, using the shared `v1` envelope:
+`contractVersion`, `jobId`, `logicalDatasetId`, `datasetVersionId`,
+`versionNumber`, `analysisType`, `status`, `createdAt`, and analysis-specific
+`result`. Legacy `id`, `datasetId`, and `datasetVersion` fields remain available
+as compatibility aliases.
 
 The result is stored as structured JSON/JSONB and can contain EDA,
 statistical, machine-learning, insight, and visualization output
@@ -238,10 +305,12 @@ Content-Type: application/json
 
 The request contains:
 
+-   `datasetVersionId` for the concrete file (legacy `datasetId` is accepted)
 -   dataset path
 -   file type
 -   analysis type
 -   optional target column
+-   optional `enableHyperparameterTuning` (defaults to `false`)
 
 The analysis registry selects the appropriate Python analysis service.
 
@@ -251,7 +320,12 @@ Current registered analysis types in the inspected Python service:
 EDA
 STATISTICAL
 MACHINE_LEARNING
+INSIGHT
 ```
+
+`TIME_SERIES` and `TEXT_ANALYSIS` are not currently supported. Requests using
+either value receive HTTP 400 until the corresponding analysis implementation
+is available.
 
 The wider Java enum also defines:
 
@@ -293,7 +367,13 @@ Content-Type: application/json
 ```
 
 The endpoint validates the dataset path and delegates to the
-dataset-cleaning service.
+dataset-cleaning service. The response output is always normalized to CSV,
+regardless of the input dataset format or requested extension: `format` is
+`CSV`, `extension` is `csv`, and `content_type` is `text/csv`. The JSON
+contains `artifact_id`, `sha256`, and `size_bytes`, plus cleaning metadata; it
+does not contain the file bytes. Download the one-time artifact from
+`GET /internal/artifacts/{artifact_id}`. A successful download removes it;
+undownloaded artifacts expire after 24 hours.
 
 **Failure handling**
 
@@ -312,11 +392,11 @@ dataset-cleaning service.
   ----------------- ------------------------------------- ----------------- -----------------
   POST              `/api/datasets`                       Spring Boot       Upload dataset
 
-  GET               `/api/datasets/{id}`                  Spring Boot       Retrieve dataset
+  GET               `/api/datasets/{datasetVersionId}`    Spring Boot       Retrieve version
 
   GET               `/api/datasets`                       Spring Boot       List datasets
 
-  GET               `/api/datasets/{datasetId}/lineage`   Spring Boot       Retrieve dataset
+  GET               `/api/datasets/{datasetVersionId}/lineage` Spring Boot   Retrieve version
                                                                             lineage
 
   POST              `/api/analysis/jobs`                  Spring Boot       Create analysis
@@ -330,8 +410,10 @@ dataset-cleaning service.
 
   POST              `/internal/analyze`                   FastAPI           Execute analysis
 
-  POST              `/internal/clean`                     FastAPI           Execute cleaning
-                                                                            workflow
+  POST              `/internal/clean`                     FastAPI           Return cleaning
+                                                                            artifact metadata
+  GET               `/internal/artifacts/{artifactId}`     FastAPI           Download one-time
+                                                                            cleaning artifact
   -------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------

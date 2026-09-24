@@ -9,6 +9,9 @@ import java.util.UUID;
 public class DatasetResponse {
     private final UUID id;
     private final UUID logicalDatasetId;
+    private final UUID datasetVersionId;
+    /** @deprecated Use datasetVersionId. */
+    @Deprecated
     private final UUID versionId;
     private final Integer versionNumber;
     private final UUID currentVersionId;
@@ -25,6 +28,7 @@ public class DatasetResponse {
                 ? dataset.getLogicalDatasetId()
                 : dataset.getId();
         this.logicalDatasetId = dataset.getLogicalDatasetId();
+        this.datasetVersionId = dataset.getId();
         this.versionId = dataset.getId();
         this.versionNumber = dataset.getVersionNumber();
         this.currentVersionId = dataset.getCurrentVersionId();
@@ -37,8 +41,13 @@ public class DatasetResponse {
         this.processedAt = dataset.getProcessedAt();
     }
 
+    /** @deprecated Use logicalDatasetId for the family or datasetVersionId for a file version. */
+    @Deprecated
     public UUID getId() { return id; }
     public UUID getLogicalDatasetId() { return logicalDatasetId; }
+    public UUID getDatasetVersionId() { return datasetVersionId; }
+    /** @deprecated Use datasetVersionId. */
+    @Deprecated
     public UUID getVersionId() { return versionId; }
     public Integer getVersionNumber() { return versionNumber; }
     public UUID getCurrentVersionId() { return currentVersionId; }

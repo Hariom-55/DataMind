@@ -2,9 +2,13 @@ package com.datamind.datamind_api.dataset.entity;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(
@@ -37,6 +41,10 @@ public class DatasetLineage {
     @Column(columnDefinition = "TEXT")
     private String details;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "operation_config", columnDefinition = "jsonb", nullable = false)
+    private List<Map<String, Object>> operationConfig = List.of();
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -50,12 +58,25 @@ public class DatasetLineage {
             Integer rowsAffected,
             String details
     ) {
+        this(parentDataset, childDataset, operation, columnName, rowsAffected, details, List.of());
+    }
+
+    public DatasetLineage(
+            Dataset parentDataset,
+            Dataset childDataset,
+            String operation,
+            String columnName,
+            Integer rowsAffected,
+            String details,
+            List<Map<String, Object>> operationConfig
+    ) {
         this.parentDataset = parentDataset;
         this.childDataset = childDataset;
         this.operation = operation;
         this.columnName = columnName;
         this.rowsAffected = rowsAffected;
         this.details = details;
+        this.operationConfig = operationConfig == null ? List.of() : operationConfig;
         this.createdAt = LocalDateTime.now();
     }
 
@@ -67,4 +88,5 @@ public class DatasetLineage {
     public Integer getRowsAffected() { return rowsAffected; }
     public String getDetails() { return details; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public List<Map<String, Object>> getOperationConfig() { return operationConfig; }
 }

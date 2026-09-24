@@ -34,7 +34,9 @@ describe("DatasetUpload", () => {
 
   it("uploads the selected file successfully", async () => {
     const uploadedDataset = {
-      id: "dataset-123",
+      logicalDatasetId: "dataset-123",
+      datasetVersionId: "version-123",
+      versionNumber: 1,
       name: "users.csv",
       status: "UPLOADED",
     };
@@ -60,9 +62,7 @@ describe("DatasetUpload", () => {
     expect(screen.getByRole("button", { name: "Uploading..." })).toBeDisabled();
 
     await waitFor(() => {
-      expect(
-        screen.getByRole("status"),
-      ).toHaveTextContent("dataset-123");
+      expect(screen.getByRole("status")).toHaveTextContent("version v1 uploaded successfully");
     });
 
     expect(uploadDatasetFile).toHaveBeenCalledWith(file);

@@ -45,7 +45,8 @@ class CleanedDatasetResultService:
             content
         )
 
-        normalized_extension = extension.lstrip(".")
+        # Cleaned output is always serialized as CSV, regardless of input format.
+        normalized_extension = "csv"
 
         return CleanedDatasetResult(
             content=content,

@@ -4,9 +4,7 @@ import InsightDashboard from "./dashboards/InsightDashboard";
 import MLDashboard from "./dashboards/MLDashboard";
 
 function AnalysisDashboardRouter({ analysisType, result }) {
-  const type = String(
-    analysisType || result?.analysisType || "INSIGHT",
-  ).toUpperCase();
+  const type = String(analysisType || "INSIGHT").toUpperCase();
 
   switch (type) {
     case "EDA":
@@ -18,7 +16,12 @@ function AnalysisDashboardRouter({ analysisType, result }) {
     case "INSIGHT":
       return <InsightDashboard result={result} />;
     default:
-      return <InsightDashboard result={result} />;
+      return (
+        <div className="empty-state" role="alert">
+          <strong>Unsupported analysis type.</strong>
+          <span>This dashboard does not support “{type}”.</span>
+        </div>
+      );
   }
 }
 

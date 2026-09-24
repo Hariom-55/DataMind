@@ -56,4 +56,11 @@ describe("AnalysisDashboardRouter", () => {
 
     expect(screen.getByText("PROBLEM TYPE")).toBeInTheDocument();
   });
+
+  it("shows an explicit unsupported state for unknown analysis types", () => {
+    render(<AnalysisDashboardRouter analysisType="FUTURE_TYPE" result={{}} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Unsupported analysis type.");
+    expect(screen.getByRole("alert")).toHaveTextContent("FUTURE_TYPE");
+  });
 });

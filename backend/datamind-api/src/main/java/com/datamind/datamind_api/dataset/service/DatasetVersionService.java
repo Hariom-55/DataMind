@@ -6,6 +6,8 @@ import com.datamind.datamind_api.dataset.repository.DatasetLineageRepository;
 import com.datamind.datamind_api.dataset.repository.DatasetRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class DatasetVersionService {
@@ -36,6 +38,24 @@ public class DatasetVersionService {
             String columnName,
             Integer rowsAffected,
             String details
+    ) {
+        return createVersion(parentDataset, name, contentHash, fileSize, fileType,
+                storagePath, operation, columnName, rowsAffected, details, List.of());
+    }
+
+    @Transactional
+    public Dataset createVersion(
+            Dataset parentDataset,
+            String name,
+            String contentHash,
+            Long fileSize,
+            String fileType,
+            String storagePath,
+            String operation,
+            String columnName,
+            Integer rowsAffected,
+            String details,
+            List<Map<String, Object>> operationConfig
     ) {
         if (parentDataset == null) {
             throw new IllegalArgumentException("Parent dataset is required");
@@ -78,7 +98,8 @@ public class DatasetVersionService {
                 operation,
                 columnName,
                 rowsAffected,
-                details
+                details,
+                operationConfig
         );
         lineageRepository.save(lineage);
 

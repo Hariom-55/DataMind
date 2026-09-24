@@ -12,7 +12,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -76,13 +75,9 @@ class DatasetCleaningOrchestrationServiceTest
                 "name,age\nHariom,22\nRahul,24\n"
                         .getBytes(StandardCharsets.UTF_8);
 
-        String encodedContent =
-                Base64.getEncoder()
-                        .encodeToString(cleanedContent);
-
         PythonCleaningResponse response =
                 new PythonCleaningResponse(
-                        encodedContent,
+                        "unused-artifact",
                         "cleaned-hash",
                         "csv",
                         3,
@@ -118,6 +113,9 @@ class DatasetCleaningOrchestrationServiceTest
                 "csv"
         )).thenReturn(response);
 
+        when(pythonCleaningClient.downloadArtifact(response.artifact_id()))
+                .thenReturn(cleanedContent);
+
         when(datasetStorageService.storeBytes(
                 cleanedContent,
                 "cleaned-hash",
@@ -131,12 +129,13 @@ class DatasetCleaningOrchestrationServiceTest
                 eq("customers.csv"),
                 eq("cleaned-hash"),
                 eq((long) cleanedContent.length),
-                eq("csv"),
+                eq("text/csv"),
                 eq("data/datasets/cleaned-hash.csv"),
                 anyString(),
                 isNull(),
                 eq(1),
-                anyString()
+                anyString(),
+                anyList()
         )).thenReturn(cleanedDataset);
 
         Dataset result =
@@ -174,12 +173,13 @@ class DatasetCleaningOrchestrationServiceTest
                 eq("customers.csv"),
                 eq("cleaned-hash"),
                 eq((long) cleanedContent.length),
-                eq("csv"),
+                eq("text/csv"),
                 eq("data/datasets/cleaned-hash.csv"),
                 eq("IMPUTE_MISSING_VALUES"),
                 isNull(),
                 eq(1),
-                contains("1 missing value imputed")
+                contains("1 missing value imputed"),
+                anyList()
         );
     }
 
@@ -203,13 +203,9 @@ class DatasetCleaningOrchestrationServiceTest
                 "city,age\nDelhi,22\nMumbai,24\n"
                         .getBytes(StandardCharsets.UTF_8);
 
-        String encodedContent =
-                Base64.getEncoder()
-                        .encodeToString(cleanedContent);
-
         PythonCleaningResponse response =
                 new PythonCleaningResponse(
-                        encodedContent,
+                        "unused-artifact",
                         "multi-cleaned-hash",
                         "csv",
                         20,
@@ -247,6 +243,9 @@ class DatasetCleaningOrchestrationServiceTest
                 eq("csv")
         )).thenReturn(response);
 
+        when(pythonCleaningClient.downloadArtifact(response.artifact_id()))
+                .thenReturn(cleanedContent);
+
         when(datasetStorageService.storeBytes(
                 cleanedContent,
                 "multi-cleaned-hash",
@@ -260,12 +259,13 @@ class DatasetCleaningOrchestrationServiceTest
                 anyString(),
                 eq("multi-cleaned-hash"),
                 anyLong(),
-                eq("csv"),
+                eq("text/csv"),
                 anyString(),
                 eq("NORMALIZE_CATEGORIES,IMPUTE_MISSING_VALUES"),
                 isNull(),
                 eq(5),
-                anyString()
+                anyString(),
+                anyList()
         )).thenReturn(cleanedDataset);
 
         Dataset result =
@@ -281,12 +281,13 @@ class DatasetCleaningOrchestrationServiceTest
                 eq("customers.csv"),
                 eq("multi-cleaned-hash"),
                 eq((long) cleanedContent.length),
-                eq("csv"),
+                eq("text/csv"),
                 eq("data/datasets/multi-cleaned-hash.csv"),
                 eq("NORMALIZE_CATEGORIES,IMPUTE_MISSING_VALUES"),
                 isNull(),
                 eq(5),
-                anyString()
+                anyString(),
+                anyList()
         );
     }
 
@@ -295,19 +296,15 @@ class DatasetCleaningOrchestrationServiceTest
     void shouldCreateGenericOperationWhenNoChangesAreReturned()
     {
         List<PythonCleaningOperation> operations =
-                List.of();
+                List.of(new PythonCleaningOperation("REMOVE_DUPLICATES", null));
 
         byte[] cleanedContent =
                 "name,age\nHariom,22\n"
                         .getBytes(StandardCharsets.UTF_8);
 
-        String encodedContent =
-                Base64.getEncoder()
-                        .encodeToString(cleanedContent);
-
         PythonCleaningResponse response =
                 new PythonCleaningResponse(
-                        encodedContent,
+                        "unused-artifact",
                         "unchanged-hash",
                         "csv",
                         1,
@@ -332,6 +329,9 @@ class DatasetCleaningOrchestrationServiceTest
                 eq("csv")
         )).thenReturn(response);
 
+        when(pythonCleaningClient.downloadArtifact(response.artifact_id()))
+                .thenReturn(cleanedContent);
+
         when(datasetStorageService.storeBytes(
                 cleanedContent,
                 "unchanged-hash",
@@ -345,12 +345,13 @@ class DatasetCleaningOrchestrationServiceTest
                 anyString(),
                 eq("unchanged-hash"),
                 anyLong(),
-                eq("csv"),
+                eq("text/csv"),
                 anyString(),
                 eq("CLEAN_DATASET"),
                 isNull(),
                 eq(0),
-                eq("Cleaning completed with no recorded changes")
+                eq("Cleaning completed with no recorded changes"),
+                anyList()
         )).thenReturn(cleanedDataset);
 
         Dataset result =
@@ -366,12 +367,13 @@ class DatasetCleaningOrchestrationServiceTest
                 eq("customers.csv"),
                 eq("unchanged-hash"),
                 eq((long) cleanedContent.length),
-                eq("csv"),
+                eq("text/csv"),
                 eq("data/datasets/unchanged-hash.csv"),
                 eq("CLEAN_DATASET"),
                 isNull(),
                 eq(0),
-                eq("Cleaning completed with no recorded changes")
+                eq("Cleaning completed with no recorded changes"),
+                anyList()
         );
     }
 
@@ -436,7 +438,7 @@ class DatasetCleaningOrchestrationServiceTest
 
 
     @Test
-    void shouldRejectInvalidBase64Content()
+    void shouldRejectArtifactHashMismatch()
     {
         List<PythonCleaningOperation> operations =
                 List.of(
@@ -448,7 +450,7 @@ class DatasetCleaningOrchestrationServiceTest
 
         PythonCleaningResponse response =
                 new PythonCleaningResponse(
-                        "NOT_VALID_BASE64!!!",
+                        "artifact-1",
                         "invalid-hash",
                         "csv",
                         3,
@@ -463,7 +465,10 @@ class DatasetCleaningOrchestrationServiceTest
                                         1,
                                         "1 duplicate row removed"
                                 )
-                        )
+                        ),
+                        "CSV",
+                        "text/csv",
+                        4
                 );
 
         when(pythonCleaningClient.clean(
@@ -472,6 +477,9 @@ class DatasetCleaningOrchestrationServiceTest
                 eq(operations),
                 eq("csv")
         )).thenReturn(response);
+
+        when(pythonCleaningClient.downloadArtifact("artifact-1"))
+                .thenReturn("data".getBytes(StandardCharsets.UTF_8));
 
         IllegalArgumentException exception =
                 assertThrows(
@@ -483,7 +491,7 @@ class DatasetCleaningOrchestrationServiceTest
                 );
 
         assertEquals(
-                "Invalid Base64 content returned by Python cleaning service",
+                "Python cleaning artifact hash does not match metadata",
                 exception.getMessage()
         );
 
@@ -556,6 +564,9 @@ class DatasetCleaningOrchestrationServiceTest
                         eq("csv")
                 )
         ).thenReturn(response);
+
+        when(pythonCleaningClient.downloadArtifact(response.artifact_id()))
+                .thenReturn("data".getBytes(StandardCharsets.UTF_8));
 
         Dataset result =
                 service.cleanDataset(

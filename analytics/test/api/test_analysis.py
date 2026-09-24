@@ -1,4 +1,3 @@
-import base64
 
 import pandas as pd
 import pytest
@@ -15,6 +14,43 @@ TEST_DATASET_ID = "22222222-2222-2222-2222-222222222222"
 
 
 class TestAnalysisAPI:
+
+    def test_cleaning_assessment_and_preview_are_read_only(self, tmp_path):
+        dataset = pd.DataFrame({"name": ["A", "A", "B"], "score": [1, 1, None]})
+        file_path = tmp_path / "cleaning.csv"
+        dataset.to_csv(file_path, index=False)
+
+        assessment = client.post(
+            "/internal/clean/assessment",
+            json={"dataset_id": TEST_DATASET_ID, "dataset_path": str(file_path)},
+        )
+        assert assessment.status_code == 200
+        assert assessment.json()["totalRows"] == 3
+        assert assessment.json()["issueCount"] > 0
+
+        preview = client.post(
+            "/internal/clean/preview",
+            json={
+                "dataset_id": TEST_DATASET_ID,
+                "dataset_path": str(file_path),
+                "operations": [{"operation": "REMOVE_DUPLICATES"}],
+            },
+        )
+        assert preview.status_code == 200
+        assert preview.json()["originalRows"] == 3
+        assert preview.json()["cleanedRows"] == 2
+        assert not preview.json().get("content")
+        assert len(pd.read_csv(file_path)) == 3
+
+    def test_cleaning_preview_requires_operations(self, tmp_path):
+        file_path = tmp_path / "cleaning.csv"
+        pd.DataFrame({"score": [1, 2]}).to_csv(file_path, index=False)
+        response = client.post(
+            "/internal/clean/preview",
+            json={"dataset_id": TEST_DATASET_ID, "dataset_path": str(file_path)},
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "At least one cleaning operation is required"
 
     def test_should_run_eda_analysis(self, tmp_path):
 
@@ -288,7 +324,7 @@ class TestAnalysisAPI:
                         "column": "age"
                     }
                 ],
-                "extension": "csv"
+                "extension": "xlsx"
             }
         )
 
@@ -296,10 +332,14 @@ class TestAnalysisAPI:
 
         body = response.json()
 
-        assert "content" in body
-        assert "content_hash" in body
+        assert "artifact_id" in body
+        assert "content" not in body
+        assert len(body["sha256"]) == 64
+        assert body["size_bytes"] > 0
 
         assert body["extension"] == "csv"
+        assert body["format"] == "CSV"
+        assert body["content_type"] == "text/csv"
 
         assert body["original_rows"] == 3
         assert body["cleaned_rows"] == 3
@@ -308,6 +348,11 @@ class TestAnalysisAPI:
         assert body["cleaned_columns"] == 2
 
         assert body["operations_applied"] == 1
+
+        download = client.get(f"/internal/artifacts/{body['artifact_id']}")
+        assert download.status_code == 200
+        assert download.content.startswith(b"name,age\n")
+        assert client.get(f"/internal/artifacts/{body['artifact_id']}").status_code == 404
 
         assert len(body["changes"]) == 1
 
@@ -459,7 +504,7 @@ class TestAnalysisAPI:
 
         assert response.status_code == 422
 
-    def test_should_return_base64_encoded_cleaned_dataset(
+    def test_should_return_cleaned_dataset_as_downloadable_artifact(
             self,
             tmp_path
     ):
@@ -486,10 +531,12 @@ class TestAnalysisAPI:
 
         body = response.json()
 
-        decoded_content = base64.b64decode(
-            body["content"]
-        ).decode("utf-8")
+        assert "content" not in body
+        assert body["size_bytes"] > 0
+        download = client.get(f"/internal/artifacts/{body['artifact_id']}")
+        decoded_content = download.content.decode("utf-8")
 
+        assert download.status_code == 200
         assert "name,age" in decoded_content
         assert "Hariom,22" in decoded_content
         assert "Rahul,24" in decoded_content
@@ -773,3 +820,55 @@ class TestAnalysisAPI:
 
         assert len(ml_visualizations) > 0
 
+
+    def test_should_run_supervised_ml_and_persist_reproducible_artifacts(
+        self,
+        tmp_path
+    ):
+        import shutil
+
+        dataset = pd.DataFrame({
+            "customer_id": range(1, 13),
+            "age": [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
+            "income": [20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42],
+            "target": ["low", "low", "low", "low", "low", "low", "high", "high", "high", "high", "high", "high"],
+        })
+        file_path = tmp_path / "supervised.csv"
+        dataset.to_csv(file_path, index=False)
+
+        job_id = "33333333-3333-3333-3333-333333333333"
+        artifact_root = __import__("app.api.analysis", fromlist=["ml_analysis_service"]).ml_analysis_service.artifact_store.directory
+        run_dir = artifact_root / job_id
+        shutil.rmtree(run_dir, ignore_errors=True)
+
+        response = client.post(
+            "/internal/analyze",
+            json={
+                "jobId": job_id,
+                "datasetVersionId": TEST_DATASET_ID,
+                "analysisType": "MACHINE_LEARNING",
+                "datasetPath": str(file_path),
+                "targetColumn": "target",
+            },
+        )
+
+        assert response.status_code == 200
+        result = response.json()["result"]
+        training = result["training"]
+
+        assert result["problemType"] == "CLASSIFICATION"
+        assert training["featureSelection"]["selectedFeatures"] == ["age", "income"]
+        assert any(item["feature"] == "customer_id" for item in training["featureSelection"]["removedFeatures"])
+
+        artifacts = training["artifacts"]
+        assert artifacts["runId"] == job_id
+        assert artifacts["artifactErrors"] == {}
+        assert set(("model", "preprocessor", "featureSelector", "metadata")).issubset(artifacts["artifacts"].keys())
+
+        try:
+            assert (run_dir / "model.joblib").exists()
+            assert (run_dir / "preprocessor.joblib").exists()
+            assert (run_dir / "feature_selector.joblib").exists()
+            assert (run_dir / "metadata.json").exists()
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
