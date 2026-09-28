@@ -128,6 +128,7 @@ public class GlobalExceptionHandler
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleUnexpectedException(Exception exception)
     {
+        exception.printStackTrace();
         return new ErrorResponse(
                 500,
                 "INTERNAL_SERVER_ERROR",
