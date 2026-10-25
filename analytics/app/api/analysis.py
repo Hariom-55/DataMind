@@ -1,7 +1,8 @@
 
 from uuid import UUID
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+import logging
+from fastapi import APIRouter,Depends, HTTPException
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 from uuid import UUID
@@ -22,8 +23,12 @@ from app.services.cleaning.cleaning_artifact_store import CleaningArtifactStore
 from app.services.insight.insight_engine import InsightEngine
 from app.services.insight.insight_orchestration_service import InsightOrchestrationService
 from app.services.visualization.visualization_orchestration_service import VisualizationOrchestrationService
+from app.core.analysis import require_internal_api_key
 
-router = APIRouter()
+router = APIRouter(
+    dependencies=[Depends(require_internal_api_key)]
+)
+logger = logging.getLogger(__name__)
 
 #shared services
 dataset_loader = DatasetLoader()
@@ -98,6 +103,9 @@ def analyze(request: AnalysisRequest):
                 str(dataset_path),
                 request.fileType,
                 request.targetColumn,
+                enable_hyperparameter_tuning=request.enableHyperparameterTuning,
+                job_id=request.jobId,
+                feature_selection_configuration=request.featureSelectionConfiguration,
             )
         elif request.analysisType.value == "STATISTICAL":
             result = service.analyze(
@@ -136,9 +144,10 @@ def analyze(request: AnalysisRequest):
         raise
 
     except Exception as ex:
+        logger.exception("Analysis request failed")
         raise HTTPException(
             status_code=500,
-            detail=str(ex)
+            detail="Analysis failed"
         )
 
     return {
@@ -172,10 +181,10 @@ def clean_dataset(request: CleanDatasetRequest):
         raise
 
     except Exception as ex:
-
+        logger.exception("Cleaning request failed")
         raise HTTPException(
             status_code=500,
-            detail=str(ex)
+            detail="Cleaning failed"
         )
 
 
@@ -205,7 +214,8 @@ def assess_cleaning(request: CleanDatasetRequest):
     except ValueError as ex:
         raise HTTPException(status_code=400, detail=str(ex))
     except Exception as ex:
-        raise HTTPException(status_code=500, detail=str(ex))
+        logger.exception("Cleaning assessment failed")
+        raise HTTPException(status_code=500, detail="Cleaning assessment failed")
 
 
 @router.post("/internal/clean/preview")
@@ -231,5 +241,6 @@ def preview_cleaning(request: CleanDatasetRequest):
     except ValueError as ex:
         raise HTTPException(status_code=400, detail=str(ex))
     except Exception as ex:
-        raise HTTPException(status_code=500, detail=str(ex))
+        logger.exception("Cleaning preview failed")
+        raise HTTPException(status_code=500, detail="Cleaning preview failed")
 
