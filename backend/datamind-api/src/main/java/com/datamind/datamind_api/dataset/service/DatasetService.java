@@ -17,6 +17,8 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 @Service
 public class DatasetService {
@@ -63,6 +65,13 @@ public class DatasetService {
             UUID logicalId = requested.getLogicalDatasetId() != null
                     ? requested.getLogicalDatasetId()
                     : requested.getId();
+
+            // Serialize version allocation for this logical dataset. The
+            // unique constraint remains the final guard against duplicates.
+            datasetRepository.findLogicalDatasetRootForUpdate(logicalId)
+                    .orElseThrow(() -> new DatasetNotFoundException(
+                            "Logical dataset not found: " + logicalId
+                    ));
 
             Optional<Dataset> existing = datasetRepository
                     .findByLogicalDatasetIdAndContentHash(logicalId, contentHash);
@@ -178,6 +187,76 @@ public class DatasetService {
         if (!allowedExtensions.contains(extension)) {
             throw new IllegalArgumentException("Unsupported dataset file type: " + extension);
         }
+
+        String contentType = file.getContentType();
+        if (StringUtils.hasText(contentType)
+                && !Set.of("application/octet-stream", "binary/octet-stream")
+                .contains(contentType.toLowerCase(Locale.ROOT))
+                && !allowedContentTypes(extension).contains(contentType.toLowerCase(Locale.ROOT))) {
+            throw new IllegalArgumentException(
+                    "Dataset content type does not match its file extension"
+            );
+        }
+
+        validateContentSignature(file, extension);
+    }
+
+    private Set<String> allowedContentTypes(String extension) {
+        return switch (extension) {
+            case "csv" -> Set.of("text/csv", "application/csv", "text/plain", "application/vnd.ms-excel");
+            case "json" -> Set.of("application/json", "text/json");
+            case "xlsx" -> Set.of("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            case "xls" -> Set.of("application/vnd.ms-excel");
+            case "parquet" -> Set.of("application/vnd.apache.parquet", "application/x-parquet");
+            default -> Set.of();
+        };
+    }
+
+    private void validateContentSignature(MultipartFile file, String extension) {
+        try (var input = file.getInputStream()) {
+            byte[] prefix = input.readNBytes(8);
+            boolean valid = switch (extension) {
+                case "xlsx" -> prefix.length >= 4 && prefix[0] == 'P' && prefix[1] == 'K'
+                        && prefix[2] == 3 && prefix[3] == 4;
+                case "xls" -> prefix.length >= 8
+                        && (prefix[0] & 0xff) == 0xD0 && (prefix[1] & 0xff) == 0xCF
+                        && (prefix[2] & 0xff) == 0x11 && (prefix[3] & 0xff) == 0xE0;
+                case "parquet" -> isParquetFile(file, input, prefix);
+                case "csv", "json" -> isTextData(prefix, extension);
+                default -> false;
+            };
+            if (!valid) {
+                throw new IllegalArgumentException(
+                        "Dataset content does not match its file extension"
+                );
+            }
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("Could not inspect dataset content", exception);
+        }
+    }
+
+    private boolean isParquetFile(
+            MultipartFile file,
+            java.io.InputStream input,
+            byte[] prefix
+    ) throws IOException {
+        if (prefix.length != 8 || file.getSize() < 12
+                || prefix[0] != 'P' || prefix[1] != 'A'
+                || prefix[2] != 'R' || prefix[3] != '1') {
+            return false;
+        }
+        input.skipNBytes(file.getSize() - 12);
+        byte[] footer = input.readNBytes(4);
+        return footer.length == 4 && footer[0] == 'P' && footer[1] == 'A'
+                && footer[2] == 'R' && footer[3] == '1';
+    }
+
+    private boolean isTextData(byte[] prefix, String extension) {
+        String sample = new String(prefix, StandardCharsets.UTF_8)
+                .replace("\uFEFF", "").trim();
+        if (sample.isEmpty() || sample.indexOf('\0') >= 0) return false;
+        if ("csv".equals(extension)) return true;
+        return "{}[\"-0123456789tfn".indexOf(sample.charAt(0)) >= 0;
     }
 
     public Dataset getDatasetById(UUID id) {

@@ -1,16 +1,19 @@
 package com.datamind.datamind_api.analysis.config;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.context.annotation.Primary;
 import org.springframework.web.client.RestClient;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.time.Duration;
 
 @Configuration
 public class PythonClientConfig {
+
+    @Value("${datamind.python.internal-api-key:}")
+    private String internalApiKey;
 
     @Value("${datamind.python.base-url}")
     private String pythonBaseUrl;
@@ -30,15 +33,41 @@ public class PythonClientConfig {
     }
 
     @Bean
-    public RestClient pythonRestClient(RestClient.Builder restClientBuilder) {
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+    public RestClient pythonRestClient(
+            RestClient.Builder restClientBuilder
+    ) {
+        SimpleClientHttpRequestFactory requestFactory =
+                new SimpleClientHttpRequestFactory();
+
         requestFactory.setConnectTimeout(connectTimeout);
         requestFactory.setReadTimeout(readTimeout);
 
         return restClientBuilder
                 .baseUrl(pythonBaseUrl)
                 .requestFactory(requestFactory)
-                .requestInterceptor(new PythonRequestLoggingInterceptor())
+
+                // Add authentication to every Spring → Python request.
+                .requestInterceptor((request, body, execution) -> {
+
+                    if (internalApiKey == null || internalApiKey.isBlank()) {
+                        throw new IllegalStateException(
+                                "DATAMIND_INTERNAL_API_KEY is not configured"
+                        );
+                    }
+
+                    request.getHeaders().set(
+                            "X-Internal-API-Key",
+                            internalApiKey
+                    );
+
+                    return execution.execute(request, body);
+                })
+
+                // Logging interceptor must come after authentication so it
+                // can see the header and redact it before logging.
+                .requestInterceptor(
+                        new PythonRequestLoggingInterceptor()
+                )
                 .build();
     }
 }

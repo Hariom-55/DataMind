@@ -65,6 +65,8 @@ public class DatasetVersionService {
                 ? parentDataset.getLogicalDatasetId()
                 : (parentDataset.getId() != null ? parentDataset.getId() : java.util.UUID.randomUUID());
 
+        datasetRepository.findLogicalDatasetRootForUpdate(logicalId);
+
         Dataset existing = datasetRepository.findByLogicalDatasetIdAndContentHash(
                 logicalId,
                 contentHash

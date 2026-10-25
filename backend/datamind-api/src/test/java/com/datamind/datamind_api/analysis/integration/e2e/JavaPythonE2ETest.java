@@ -1053,7 +1053,7 @@ class JavaPythonE2ETest
             );
 
             assertEquals(
-                    "csv",
+                    "text/csv",
                     cleanedDataset.getFileType()
             );
 

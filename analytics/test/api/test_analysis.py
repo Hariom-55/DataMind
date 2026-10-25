@@ -7,13 +7,23 @@ from app.main import app
 from app.api.analysis import eda_service, dataset_cleaning_service
 
 
-client = TestClient(app)
+TEST_API_KEY = "datamind-test-internal-key"
+client = TestClient(app, headers={"X-Internal-API-Key": TEST_API_KEY})
 
 TEST_JOB_ID = "11111111-1111-1111-1111-111111111111"
 TEST_DATASET_ID = "22222222-2222-2222-2222-222222222222"
 
 
 class TestAnalysisAPI:
+
+    def test_health_is_public_and_internal_routes_require_authentication(self):
+        unauthenticated_client = TestClient(app)
+
+        assert unauthenticated_client.get("/health").status_code == 200
+        response = unauthenticated_client.post("/internal/analyze", json={})
+
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Unauthorized"
 
     def test_cleaning_assessment_and_preview_are_read_only(self, tmp_path):
         dataset = pd.DataFrame({"name": ["A", "A", "B"], "score": [1, 1, None]})
@@ -244,7 +254,8 @@ class TestAnalysisAPI:
 
         body = response.json()
 
-        assert body["detail"] == "Analysis service failed"
+        assert body["detail"] == "Analysis failed"
+        assert "Analysis service failed" not in body["detail"]
 
     def test_should_run_eda_analysis_on_xlsx(self, tmp_path):
         dataset = pd.DataFrame({

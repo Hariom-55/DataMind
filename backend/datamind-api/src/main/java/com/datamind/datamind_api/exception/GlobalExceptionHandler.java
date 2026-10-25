@@ -10,10 +10,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler
 {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     @ExceptionHandler(DatasetNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleDatasetNotFound(DatasetNotFoundException exception)
@@ -128,7 +131,8 @@ public class GlobalExceptionHandler
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleUnexpectedException(Exception exception)
     {
-        exception.printStackTrace();
+        log.error("Unhandled request failure (requestId={})",
+                org.slf4j.MDC.get("requestId"), exception);
         return new ErrorResponse(
                 500,
                 "INTERNAL_SERVER_ERROR",
